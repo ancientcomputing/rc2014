@@ -8,6 +8,7 @@
 ; 5. Shorten messages etc and squeeze everything in under original 150h code length      
 ; 
 ; All mods to original code are copyright Ben Chong and freely licensed to the community
+; Developed for the RC2014 (rc2014.co.uk)
 ;
 ;==================================================================================
 ;
@@ -80,6 +81,7 @@ RST10            JP      rst10vector	; RXA
 
 ;------------------------------------------------------------------------------
 ; Check serial status
+; Check if serial receive buffer is empty
 
                 .ORG 0018H
 RST18            JP      rst18vector	; CKINCHAR
@@ -168,6 +170,7 @@ handle_nmi:
                 RETI
 
 ;------------------------------------------------------------------------------
+; RST 10H
 RXA:
 waitForChar:    LD       A,(serBufUsed)
                 CP       $00
@@ -196,6 +199,8 @@ FIXME:
                 RET                      ; Char ready in A
 
 ;------------------------------------------------------------------------------
+; Output character to 68B50
+; Note that this is a blocking call
 TXA:            PUSH     AF              ; Store character
 conout1:        IN       A,($80)         ; Status byte       
                 BIT      1,A             ; Set Zero flag if still transmitting character       
@@ -205,10 +210,13 @@ conout1:        IN       A,($80)         ; Status byte
                 RET
 
 ;------------------------------------------------------------------------------
+; Check if a character is available
+; Z=1 if buffer is empty
 CKINCHAR        LD       A,(serBufUsed)
-                CP       $0
+                CP       A, $0
                 RET
 
+;------------------------------------------------------------------------------
 PRINT:          LD       A,(HL)          ; Get character
                 OR       A               ; Is it $00 ?
                 RET      Z               ; Then RETurn on terminator
