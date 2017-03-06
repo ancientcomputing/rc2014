@@ -1,4 +1,4 @@
-# rc2014
+# RC2014
 I have a couple of Spencer Owen's RC2014 Z80-based projects.
 <p>
 Since I'm a modder at heart, I've gone ahead and modified some of the Z80 software.
