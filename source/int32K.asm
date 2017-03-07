@@ -121,7 +121,7 @@ vecTabProto	JP	TXA			; RST 08
 ;------------------------------------------------------------------------------
 
 SIGNON1:       .BYTE     CS
-		.BYTE	"RC2014",CR,LF,0
+		.BYTE	CR,LF,"RC2014",0
 ;               .BYTE     "Z80 SBC By Grant Searle",CR,LF,0
 SIGNON2:       .BYTE     CR,LF
 		.BYTE	"C/W?",0
