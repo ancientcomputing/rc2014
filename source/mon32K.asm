@@ -1,7 +1,9 @@
 ; Changes:
 ; 1. Adapted for zasm assembler including making things case sensitive
 ; 2. Adapted for RC2014 and modified init32K.asm
-; 3. Remove/commented out all non-RS232 code
+; 3. Removed/commented out all non-RS232 code
+; 4. Added W command to set the start of the workspace where we want to load the Intel HEX file. This is needed for
+; hex files that start at address 0000H instead of somewhere in RAM.
 ;
 ; Changes to Josh's original code are copyright Ben Chong and freely licensed to the community
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -296,41 +298,7 @@ Port40		equ	0x40	;LED DISPLAY, RS-232 TXD/RXD AND KEYBOARD
 
 ; [CODE]
 ; LABEL INSTRUCT PARAMETER(s)              ADR/OPCODE    ASCII
-#if 0
-		org	0x0000
-					; Z80 CPU LDRTS HERE
-		DI			; Disable Interrupts
-		IM	1		; Interrupts cause RST 0x38
-		JR	RESETLDRT
 
-;		org	0x0008		; RST	0x08
-;		RET
-
-
-		org	0x0010		; RST	0x10
-		RET
-
-		org	0x0018		; RST	0x18
-		RET
-
-		org	0x0020		; RST	0x20
-		RET
-
-		org	0x0028		; RST	0x28
-		RET
-
-		org	0x0030		; RST	0x30
-		RET
-
-		;RST	0x38		;11	;add another ~10 tc to complete previous instruction
-		org	0x0038
-		PUSH	HL		;11
-		LD	HL,(INT_VEC)	;16
-		JP	(HL)		;4
-
-		org	0x0066		; NMI Service Routine
-NMI_VEC:	RETN			;
-#endif
 
 ;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 ;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
@@ -342,342 +310,39 @@ NMI_VEC:	RETN			;
 		
 		; This part is from bas32K.asm
 		; int32K.asm is written to jump here
-COLD:   	JP      MAIN_MENU	; STARTB          ; Jump for cold start
-WARM:   	JP      MAIN_MENU	; WARMST          ; Jump for warm start
+COLD:   	JP      INIT_MENU	; STARTB          ; Jump for cold start
+WARM:   	JP      INIT_MENU	; WARMST          ; Jump for warm start
 
 ;-------------------------------------------------------------------------------- RESET LDRTUP CODE
 RESETLDRT:
 ;Save Registers & SET sp
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#if 0
-		LD	(RSHL),HL
-
-		POP	HL		;Fetch PC
-		LD	(RPC),HL	;Save the PC
-		LD	(RSSP),SP	;Save the SP
-
-		LD	SP,RSDE+2	;Set Stack to save registers DE,BC,AF
-		PUSH	DE
-		PUSH	BC
-		PUSH	AF
-
-		EX	AF,AF'		;Save Alternate register set
-		EXX			;Save Alternate register set
-		LD	SP,RSHL2+2	;Set Stack to save registers DE,BC,AF
-		PUSH	HL
-		PUSH	DE
-		PUSH	BC
-		PUSH	AF
-		EX	AF,AF'
-		EXX
-
-		LD	A,I		;Fetch IR
-		LD	B,A
-		LD	A,R
-		LD	C,A
-		PUSH	BC		;Save IR
-
-		PUSH	IY
-		PUSH	IX
-		LD	SP,StackTop	; Stack = 0xFF80 (Next Stack Push Location = 0xFF7F,0xFF7E)
-#endif
 
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ;Save Input State to Temp location (LED DISPLAY Buffer)
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#if 0
-		LD	A,0x80		;Advance Column
-		OUT	(Port40),A	; Clear LED Display & Set RS-232 TXD to inactive state
-		LD	B,8		; 8 Tries to get to Column 0
-RSIS_LP		IN	A,(Port40)	;Fetch Column
-		LD	D,A		;Save IN D (For RESET Test)
-		AND	7		;Mask Column only
-		JR	Z,RSIS_OK	;When 0, exit Test Loop
-		LD	A,0x80		;Advance Column
-		OUT	(Port40),A	; Clear LED Display & Set RS-232 TXD to inactive state
-		DJNZ	RSIS_LP
-RSIS_OK					;Input State upon reset saved IN Register D
-#endif
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ;Test Hardware - FP Board Present?
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#if 0
-					;Verify FP board is present
-		LD	BC,0x1800	; Several Loops through Column 0 proves FP board is working
-		LD	E,10		; 10 Retries if not expected Column
-
-RTHW_LP		IN	A,(Port40)	;Fetch Column
-		AND	7
-		CP	C
-		JP  Z,	RTHW_OK		;Jump if Column = expected value
-
-		DEC	E		;If not expected, count the errors.
-		JP  Z,	RTHW_NO_FP	;If error chances down to zero, there's no FP
-		JR	RTHW_ADV
-
-RTHW_OK		INC	C		; Advance expected value
-		RES	3,C		; Limit expected value to 0-7
-RTHW_ADV	LD	A,0x80		;Advance Column
-		OUT	(Port40),A	; Clear LED Display & Set RS-232 TXD to inactive state
-		DJNZ	RTHW_LP
-		JP	RTHW_FP_PRESENT
-#endif
-
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ;Execute RAM program if NO FP Board Present
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#if 0
-					;If scan counter not running, then either Execute RAM OR HALT
-RTHW_NO_FP	LD	HL,(0x8000)	;Address of RAM Valid Signature
-		LD	A,0x2		;(FP board probably not present)
-		XOR	H		;Verify RAM valid with 2F8 signature at 0x8000
-		LD	B,A
-		LD	A,0xF8
-		XOR	L
-		OR	B
-		JP	Z,0x8002	;Execute RAM
-		JP	$		;Or HALT
-
-RTHW_FP_PRESENT
-#endif
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ;Deterimine Reason for RESET ie entering Monitor Mode
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#if 0
-					;Deterimine why the CPU is executing A RESET.
-					;  -Power on (RAM signature will be wrong)
-					;  -Reset Switch (one of the switches will still be pressed)
-					;  -RST 0 (look for C7 at previous location given by stack)
-					;  -External /RESET OR User program branches to 0000
-
-		LD	HL,RAMSIGNATURE
-		LD	E,1		;Count of Errors (preset to 1 for test)
-		LD	A,0xF0		;First signature byte expected
-		LD	B,8		;#bytes in signature (loop)
-RAMSIG_LP	CP	(HL)
-		JR  Z,	RAMSIG_GOOD
-		INC	E		;Count wrong bytes
-		LD	(HL),A		;Save Signature
-RAMSIG_GOOD	INC	HL
-		SUB	0xF
-		DJNZ	RAMSIG_LP
-		DEC	E		;Test # of errors
-		JR	Z,WARM_START
-#endif
 
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#if 0
-COLD_START				;RAM Signature
-		CALL	WRITE_BLOCK	;COLD_BOOT_INIT
-		DW	RC_TYPE		;Where to write
-		DW	19		;Bytes to write
-		DB	0		;(RC_TYPE)
-		DB	0		;(RC_SOFT)
-		DB	0		;(RC_STEP)
-		DB	0		;(RC_CC)
-		DB	0		;(RC_HALT)
-		DB	0		;(RC_F0)
-		DB	0		;(RC_RST0)
-		DB	0		;(RC_HARD)
-		DW	UiVec_RET	;(UiVec)
-		DB	0		;()
-		DB	0		;(RegPtr)
-		DW	0		;(ABUSS)
-		DB	0		;(IoPtr)
-		DB	0		;(RX_ERR_LDRT)
-		DB	0		;(RX_ERR_STOP)
-		DB	0		;(RX_ERR_OVR)
-		DB	1		;(BEEP_TO)
-		LD	HL,StackTop-2
-		LD	(RSSP),HL
-		LD	HL,RAM_LDRT
-		LD	(RPC),HL
-
-;							;LOAD TEST PROGRAM INTO RAM
-;		LD	BC,SKIP_TEST-TESTP_LP+1
-;		LD	DE,0x8000
-;		LD	HL,TESTP_LP
-;		LDIR
-;		JP	SKIP_TEST
-;
-;TESTP_LP	INC	A
-;		JP  NZ,	0x8000
-;		INC	BC
-;		INC	HL
-;		DEC	DE
-;	;	HALT
-;		JP	0x8000
-;SKIP_TEST
-
-		JP	WS_END
-
-WARM_START	LD	HL,RC_SOFT	;HL=RC_SOFT
-		LD	A,(SOFT_RST_FLAG)
-		CP	0xFE
-		JR  Z,	WS_SET
-		INC	HL		;HL=RC_STEP
-		CP	0xD1
-		JR  Z,	WS_SET
-		INC	HL		;HL=RC_CC
-		CP	0xCC
-		JR  Z,	WS_SET
-		INC	HL		;HL=RC_HALT
-		CP	0x76
-		JR  Z,	WS_SET
-
-		INC	HL		;HL=RC_HARD
-		LD	A,D		;Fetch Input of Column 0
-TEST		BIT	5,A		;
-		JR NZ,	WS_SET		;Jump if F switch pressed
-		BIT	3,A		;
-		JR  Z,	WS_SET		;Jump if 0 switch pressed
-
-		INC	HL		;HL=RC_RST0
-		LD	DE,(RPC)
-		DEC	DE
-		LD	A,(DE)
-		CP	0xC7		;Did we get here by a RESTART 0 command?
-		JR  Z,	WS_SET		;Jump if RST 0 Instruction
-
-		INC	HL		;HL=RC_HARD
-
-WS_SET		LD	A,L
-		LD	(RC_TYPE),A
-		CALL	TINC		;Advance the reset counter
-WS_END
-#endif
 
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ;Init all System RAM, enable interrupts
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-#if 0
-		LD	HL,RXBUFFER
-		LD	B,0
-		CALL	CLEAR_BLOCK
-
-		LD	HL,CLEARED_SPACE
-		LD	B,CLEARED_LEN
-		CALL	CLEAR_BLOCK
-
-		LD	HL,(DISPMODE)
-		LD	(SDISPMODE),HL
-
-		CALL	WRITE_BLOCK
-		DW	ANBAR_DEF	;Where to write
-		DW	33		;Bytes to write
-		DB	0x84		;(ANBAR_DEF) = MON MODE
-		DW	GET_REG_MON	;(GET_REG)
-		DW	PUT_REG_MON	;(PUT_REG)
-		DW	CTRL_C_RET	;(CTRL_C_CHK)
-		DW	IDISP_RET	;(LDISPMODE)
-		DW	IDISP_RET	;(DISPMODE)
-		DW	IMON_CMD	;(KEY_EVENT) Initialize to Command Mode
-		DB	1		;(IK_TIMER)
-		DB	0x90		;(KEYBFMODE) HEX Keyboard Mode (F on press)
-		DB	1		;(DISPLABEL)
-		DB	-1		;(IK_HEXST)
-		DW	LED_DISPLAY	;(HEX_CURSOR) @d1
-		DW	HEX2ABUSS	;(HEX_READY)
-		DW	LED_DISPLAY	;(LED_CURSOR)
-		DW	PC_LED		;(PUTCHAR_EXE)
-		DW	RXBUFFER	;(RXBHEAD)
-		DW	RXBUFFER	;(RXBTAIL)
-		DW	ISR_INT		;(INT_VEC)
-		DW	LED_DISPLAY	;(SCAN_PTR)
-
-		CALL	DELAY_10mS
-		LD	A,0x80		;Advance Column / Clear Counter for Interrupt
-		OUT	(Port40),A	; Clear LED Display & Set RS-232 TXD to inactive state
-
-		LD	HL,LED_SPLASH_TBL
-		LD	A,(RC_TYPE)
-		AND	7
-		RLCA
-		RLCA
-		RLCA
-		CALL	ADD_HL_A
-		CALL	PRINT
-
-		LD	A,(RC_TYPE)
-		OR	A
-		JP  Z,	LSPLASH_CNT
-		LD	H, hi(RC_TYPE)
-		LD	L,A
-		LD	A,(HL)
-LSPLASH_CNT	LD	HL,LED_DISPLAY+5
-		CALL	LED_PUT_BYTE
-		LD	(HL),0x80	;Annunciator LED's OFF
-
-		JP	SKIP_TABLE1
-
-LED_SPLASH_TBL	DB	"COLD   ",EOS
-		DB	"Soft   ",EOS
-		DB	"StEp   ",EOS
-		DB	"^C     ",EOS
-		DB	"HALt   ",EOS
-		DB	"F-0    ",EOS
-		DB	"Rst0   ",EOS
-		DB	"HARD   ",EOS
-SKIP_TABLE1
-		EI			;************** Interrupts ON!!!!
-#endif
 
 ;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 ;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
 ;	Chapter 3	Main Loop, RS-232 MONITOR, MENU selection
 ;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 ;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
-#if 0
-		CALL	SEL_RS232
-
-		LD	HL,RS232_SPLASH
-		LD	A,(RC_TYPE)
-		AND	7
-		RLCA
-		CALL	ADD_HL_A
-		CALL	LD_HL_HL
-		CALL	PRINT
-		LD	A,(RC_TYPE)
-		OR	A
-		JP   Z,	SPLASH_VERSION
-		LD	H, hi(RC_TYPE)
-		LD	L,A
-		LD	A,(HL)
-		CALL	SPACE_PUT_BYTE
-		CALL	REG_DISP_ALL
-		JP	SKIP_TABLE2
-
-RS232_SPLASH	DW	R_COLD
-		DW	R_SOFT
-		DW	R_STEP
-		DW	R_CC
-		DW	R_HALT
-		DW	R_F0
-		DW	R_RST0
-		DW	R_HARD
-
-R_COLD		DB	CR,LF,"Cold Start",CR,LF,EOS
-R_SOFT		DB	CR,LF,"Soft Restart",EOS
-R_STEP		DB	CR,LF,"Step",EOS
-R_CC		DB	CR,LF,"<Ctrl>-C",EOS
-R_HALT		DB	CR,LF,"CPU HALT",EOS
-R_F0		DB	CR,LF,"F-0 Reset",EOS
-R_RST0		DB	CR,LF,"<Break>",EOS
-R_HARD		DB	CR,LF,"Hard Reset",EOS
-
-SPLASH_VERSION	CALL 	VERSION
-SKIP_TABLE2
-
-		LD	A,(RC_TYPE)
-		AND	7
-		CP	2		;If returning from Single Step, restore Monitor Display
-		JR NZ,	WB_NOT_STEP
-		LD	HL,(SDISPMODE)
-		LD	(LDISPMODE),HL
-		LD	(DISPMODE),HL
-WB_NOT_STEP	RLCA
-#endif
 
 ;************************************************************************************
 ;************************************************************************************
@@ -736,12 +401,18 @@ WB_NOT_STEP	RLCA
 ;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
 ;----------------------------------------------------------------------------------------------------; MAIN MENU
 
+INIT_MENU:
+		; Initial hex_buffer for Intel HEX uploads
+		LD	HL, 0000H
+		LD	(hex_buffer), HL
+		
 MAIN_MENU:	LD	SP, StackTop	; Reset Stack = 0xFF80
 		EI			; BC Enable interrupts
 		LD	HL, MAIN_MENU	;Push Mainmenu onto stack as default return address
 		PUSH	HL
 		CALL	PRINTI		;Monitor Start, Display Welcome Message
-		DB	CR,LF,"Main Menu >",EOS
+;		DB	CR,LF,"Main Menu >",EOS
+		DB	CR,LF,"Monitor >",EOS
 
 MM_PURGE:
 ;		CALL	In_CharBC
@@ -752,19 +423,21 @@ MM_PURGE:
 
 		CALL 	GET_CHAR	;get char
 		CP	':'
-		JP Z,	GETHEXFILE	; : = START HEX FILE LOAD
+		JP 	Z, GETHEXFILE	; : = START HEX FILE LOAD
 		CP	3
-		JP Z, MM_PURGE
-; bc		JP Z,	MM_PURGE	;ignore CTRL-C
+		JP 	Z, MM_PURGE
+; bc		JP 	Z, MM_PURGE	;ignore CTRL-C
 		AND 	0x5F		;to upper case
-		CP 	'C'		;Branch to Command entered
-		JP Z, 	MEM_DUMP	; C = Memory Dump (Continuous)
+;		CP 	'C'		;Branch to Command entered
+;		JP 	Z, MEM_DUMP	; C = Memory Dump (Continuous)
 		CP 	'D'		;Branch to Command entered
-		JP Z, 	MEM_DUMP_PAGED	; D = Memory Dump
+		JP 	Z, MEM_DUMP_PAGED	; D = Memory Dump
 		CP 	'E'
-		JP Z, 	MEM_EDIT	; E = Edit Memory
+		JP 	Z, MEM_EDIT	; E = Edit Memory
 		CP 	'G'
-		JP Z, 	MEM_EXEC	; G = Go (Execute at)
+		JP 	Z, MEM_EXEC	; G = Go (Execute at)
+		CP 	'W'
+		JP 	Z, SET_BUFFER	; W = Set buffer start address for Intel HEX upload
 #if 0
 		CP 	'S'
 		JP Z, 	GO_SINGLE	; S = Single Step
@@ -779,38 +452,27 @@ MM_PURGE:
 		CP 	'R'
 		JP Z,	REG_MENU	; R = REGISTER OPERATIONS
 #endif
-#if 0
-		CP 	'T'
-		JP Z,	RAM_TEST	; T = RAM TEST
-#endif
-#if 0
-		CP 	'M'
-		JP Z,	MEM_ENTER	; M = ENTER INTO MEMORY
-#endif
-#if 0
-		CP 	'L'
-		JP Z,	LOOP_BACK_LP	; L = Loop Back Test
-#endif
+
 		CP 	'V'
 		JP Z,	VERSION		; V = Version
 
 		CALL 	PRINTI		;Display Help when input is invalid
 		DB	CR,LF,"HELP"
-		DB	CR,LF,"D XXXX YYYY    Dump memory from XXXX to YYYY"
-		DB	CR,LF,"C XXXX YYYY    Continous Dump (no pause)"
+		DB	CR,LF,"D XXXX         Dump memory from XXXX"
+;		DB	CR,LF,"D XXXX YYYY    Dump memory from XXXX to YYYY"
+;		DB	CR,LF,"C XXXX YYYY    Continous Dump (no pause)"
 		DB	CR,LF,"E XXXX         Edit memory starting at XXXX"
 ;		DB	CR,LF,"M XXXX YY..YY  Enter many bytes into memory at XXXX"
-		DB	CR,LF,"G [XXXX]       GO (PC Optional)"
+		DB	CR,LF,"G XXXX         Go execute from XXXX"
 ;		DB	CR,LF,"S              Single Step"
 		DB	CR,LF,"I XX           Input from I/O"
 		DB	CR,LF,"O XX YY        Output to I/O"
 ;		DB	CR,LF,"R rr [=xx]     Register"
-;		DB	CR,LF,"L              Loop back test"
-;		DB	CR,LF,"T XX YY        RAM TEST from pages XX to YY"
 		DB	CR,LF,"V              Version"
+		DB	CR,LF,"W XXXX         Set workspace XXXX"
+		DB	CR,LF,":sHLtD...C     UPLOAD Intel HEX file, ':' is part of file"
 		DB	CR,LF,"X U XXXX       XMODEM Upload to memory at XXXX"
 		DB	CR,LF,"X D XXXX CCCC  XMODEM Download from XXXX for CCCC #of 128 byte blocks"
-		DB	CR,LF,":sHLtD...C     UPLOAD Intel HEX file, ':' is part of file"
 		DB	CR,LF,EOS
 
 		JP 	MAIN_MENU
@@ -933,33 +595,7 @@ REGORDER	DB	0
 ;=============================================================================
 ;Loop back test
 ;-----------------------------------------------------------------------------
-#if 0
-LOOP_BACK_LP	CALL	In_Char	;Test for any RS-232 input
-		JR C,	LB_0	;Jump if no input
-		CP	27	;<Esc> to quit
-		RET	Z
-		JR	LB_OUT	;Display
-LB_0
-		CALL In_Key_Hex		;Test regular HEX input
-		JP Z,LOOP_BACK_LP	;
 
-LB_1		OR	A
-		JP P,	LB_2	;Jump if NOT shifted
-		PUSH	AF		;If Shifted, then output a carret before the key
-		LD	A,'^'
-		CALL	Put_Char
-		POP	AF
-
-LB_2		CALL	TO_HEX	;Convert Keypad input to ASCII
-
-LB_OUT		CALL	SEL_LED
-		CALL	Put_Char
-
-		CALL	SEL_RS232
-		CALL	Put_Char
-
-		JR	LOOP_BACK_LP
-#endif
 
 ;=============================================================================
 ;MEMORY ENTER.  M XXXX YY..YY,  ENTERS AS MANY BYTES AS THERE ARE ON THE LINE.
@@ -988,10 +624,11 @@ MEN_RET		CALL	GET_CHAR	;ignore rest of line before returning to main menu
 ;=============================================================================
 ;MEMORY DUMP - Continous
 ;-----------------------------------------------------------------------------
-MEM_DUMP:	LD	B,0xFF		;Continuous Dump, No pausing
+; MEM_DUMP:	LD	B,0xFF		;Continuous Dump, No pausing
 MEM_DUMP_0	CALL	SPACE_GET_WORD	;Input start address
 		EX	DE,HL			;HL = Start
-		CALL	SPACE_GET_WORD	;Input end address (DE = end)
+;		CALL	SPACE_GET_WORD	;Input end address (DE = end)
+		LD	DE, 0FFFFH	; Auto to end of RAM
 
 MEM_DUMP_LP:	CALL	PUT_NEW_LINE
 		CALL	DUMP_LINE	;Dump 16 byte lines (advances HL)
@@ -1002,7 +639,9 @@ MEM_DUMP_LP:	CALL	PUT_NEW_LINE
 		CALL	GET_CONTINUE
 		JR	MEM_DUMP_LP
 ;=============================================================================
-;MEMORY DUMP - Paged
+; MEMORY DUMP - Paged
+; Changing behavior so that we don't need to type in end address
+; We will dump until ESC is pressed
 ;-----------------------------------------------------------------------------
 MEM_DUMP_PAGED	LD	B,0		;Paused Dump
 		JR	MEM_DUMP_0
@@ -1012,11 +651,10 @@ GET_CONTINUE	CALL	PUT_NEW_LINE
 		CALL	PRINTI
 		DB	"Press any key to continue",EOS
 		CALL	GET_CHAR
-		CP	27
-		RET NZ
+		CP	27		; Escape to abort
+		RET 	NZ
 		POP	HL		;Scrap return address
 		RET
-
 
 ;-----------------------------------------------------------------------------
 ;DUMP_LINE -- Dumps a line
@@ -1129,11 +767,14 @@ ME_LP		CALL	PUT_NEW_LINE
 ; 	Note: right now, we actually push the address on stack and return
 ;	We're ignoring all the single step stuff for now
 ;-----------------------------------------------------------------------------
-MEM_EXEC:	CALL	SPACE_GET_WORD	;Input address
-		JP	NC, ME_1
-		CP	27
-		RET Z			;Exit if <ESC> pressed
-		LD	(RPC),DE
+MEM_EXEC:	CALL	SPACE_GET_WORD	;Input address, c=1 if we have a word, c=0 if no word
+		JP	C, ME_0		; If c=1 then we have a word to jump to
+;		JP	NC, ME_1	
+		RET			; If c=0 then there is no word, abort
+;		CP	27		; 
+;		RET Z			; Exit if <ESC> pressed
+ME_0
+		LD	(RPC),DE	; Store word in RPC
 
 		PUSH	AF
 		CALL	PRINTI
@@ -1144,7 +785,7 @@ MEM_EXEC:	CALL	SPACE_GET_WORD	;Input address
 		POP	AF
 
 ME_1		CP	27
-		RET Z			;Exit if <ESC> pressed
+		RET 	Z		; Abort and exit if <ESC> pressed
 		DI			;
 #if 0
 GO_EXEC		CALL	WRITE_BLOCK	;17 + 137 + 21 * 7 = 301   	;Note, timing is critical in this routine for the Single Step function to work
@@ -1494,6 +1135,13 @@ GB_RET		OR	A
 
 
 ;=============================================================================
+; Print a space, then input a word
+;
+; in:	Nothing
+; out:	c=1	A = non-hex char input
+;		DE = Word
+; out:	c=0	A = non-hex char input (No Word in DE)
+
 SPACE_GET_WORD	CALL	PUT_SPACE
 
 ;=============================================================================
@@ -1506,15 +1154,16 @@ SPACE_GET_WORD	CALL	PUT_SPACE
 ;-----------------------------------------------------------------------------
 GET_WORD:	LD	DE,0
 		CALL	GET_HEX_CHAR	;Get 1st HEX CHAR
-		JR  NC,	GW_LP
-		CP	' '		;Exit if not HEX CHAR (ignoring SPACE)
-		JR Z,	GET_WORD	;Loop back if first char is a SPACE
-		OR	A		;Clear Carry
-		RET			;or EXIT with delimiting char
-GW_LP		LD	E,A
-		CALL	GET_HEX_CHAR
-		RET C			;EXIT when a delimiting char is entered
-		EX	DE,HL		;Else, shift new HEX Char Value into DE
+		JR  	NC, GW_LP
+					; Not HEX
+		CP	' '		; Is it SPACE
+		JR 	Z, GET_WORD	; Loop back if first char is a SPACE
+		OR	A		; Otherwise, clear Carry and exit
+		RET			; 
+GW_LP		LD	E,A		; HEX
+		CALL	GET_HEX_CHAR	; Get next char
+		RET 	C		; EXIT when a delimiting char is entered
+		EX	DE,HL		; Else, shift new HEX Char Value into DE
 		ADD	HL,HL
 		ADD	HL,HL
 		ADD	HL,HL
@@ -1547,7 +1196,7 @@ GET_HEX_CHAR:	CALL	GET_CHAR
 GHC_NOT_RET	SCF
 		RET
 GHC_ARET	SUB	0x07
-GHC_NRET	AND	0x0F
+GHC_NRET	AND	0x0F	; Clear CY
 		RET
 
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1679,12 +1328,12 @@ TINC:		INC	(HL)
 		RET
 
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-DELAY_10mS	LD	C,12
+DELAY_10mS	LD	C, 24	; bc 12
 DELAY_C		PUSH	BC
 		LD	B,0
 DELAY_LP	DJNZ	DELAY_LP	;13 * 256 / 4 = 832uSec
 		DEC	C
-		JR  NZ,	DELAY_LP	;*4 ~= 7mSec
+		JR	NZ, DELAY_LP	;*4 ~= 7mSec
 		POP	BC
 		RET
 
@@ -1717,23 +1366,38 @@ IS_LETTER	CP	'A'
 ;	Chapter 6	Menu operations. ASCII HEXFILE TRANSFER
 ;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 ;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
-;----------------------------------------------------------------------------------------------------; ASCII HEXFILE TRANSFER
-					;Registers:	B= Byte counter per line (initialized at start of line)
-					;		C= Check sum (initialized at start of line)
-					;		D= Temp for assembling HEX bytes
-					;		E= Error counter over the entire transfer
-					;		HL= Address to save data
-GETHEXFILE	LD	E,0		;ZERO ERROR COUNTER
-		JR	GHDOLINE
 
-GHWAIT		LD	A,20			;10 Second Timeout for Get char
-		CALL	TIMED_GETCHAR
+; Set the address to the buffer where we want to upload the Intel HEX file
+; This is to be used if the Intel HEX file uses 0000h as the start address
+; You will want to set this address to somewhere in RAM...
+SET_BUFFER
+		CALL	SPACE_GET_WORD	;Input address, c=1 if we have a word, c=0 if no word
+		JR	NC, SE_0	; If c=0 then there is no word, abort
+					; If c=1 then we have a word to load
+		LD	(hex_buffer),DE	; Store word
+SE_0
+		RET
+
+;----------------------------------------------------------------------------------------------------
+; ASCII HEXFILE TRANSFER
+;Registers:	B= Byte counter per line (initialized at start of line)
+;		C= Check sum (initialized at start of line)
+;		D= Temp for assembling HEX bytes
+;		E= Error counter over the entire transfer
+;		HL= Address to save data
+; We are jumping in here with the first character ":" already loaded
+GETHEXFILE	LD	E,0		;ZERO ERROR COUNTER
+		JR	GHDOLINE	; Jump straight to reading in the byte cound
+
+GHWAIT			; LD	A,20			;10 Second Timeout for Get char
+		CALL	TIMED_GETCHAR_BC
 		JR  	C, GHENDTO	; Timeout
 		CP	27		; ESC
 		JR  	Z, GHENDTO	; Abort if ESC
 		CP	':'
 		JR  	NZ, GHWAIT
 
+		; Handle a line
 GHDOLINE	CALL	TGET_BYTE	;GET BYTE COUNT
 		LD	B,A		;BYTE COUNTER
 		LD	C,A		;CHECKSUM
@@ -1743,11 +1407,16 @@ GHDOLINE	CALL	TGET_BYTE	;GET BYTE COUNT
 
 		CALL	TGET_BYTE	;GET LOW ADDRESS
 		LD	L,A
-
+		; Add buffer start
+		PUSH	DE
+		LD	DE, (hex_buffer)
+		ADD	HL, DE
+		POP	DE
 		CALL	TGET_BYTE	;GET RECORD TYPE
 		CP	1
-		JP Z,	GHEND	;IF RECORD TYPE IS 01 THEN END
-
+		JP 	Z,	GHEND	;IF RECORD TYPE IS 01 THEN END
+		
+		; Assuming everything else is data record...
 GHLOOP		CALL	TGET_BYTE	;GET DATA
 		LD	(HL),A
 		INC	HL
@@ -1756,16 +1425,24 @@ GHLOOP		CALL	TGET_BYTE	;GET DATA
 		CALL	TGET_BYTE	;GET CHECKSUM
 		XOR	A
 		CP	C		;Test Checksum = 0
-		JR Z,	GHWAIT
+		JR 	Z, GHWAIT0	; No error
 		INC	E
-		JR  NZ,	GHWAIT
+		JR  	NZ, GHWAIT0
 		DEC	E
+GHWAIT0
+		LD	A, '.'		; Output tick
+		CALL	PUT_CHARBC
 		JR	GHWAIT
 		
-GHENDTO		CALL	PRINTI
-		DB	CR,LF,"HEX TRANSFER TIMEOUT",EOS
+;GHENDTO		CALL	PRINTI
+;		DB	CR,LF,"HEX TRANSFER TIMEOUT",EOS
+;		JR	GHEND1
 	
-GHEND		CALL	PRINTI
+GHEND		; We come here on detecting RECORD TYPE = 1 but there are 2 more characters
+		CALL	TGET_BYTE	; Get the last checksum byte
+GHENDTO
+GHEND1
+		CALL	PRINTI
 		DB	CR,LF,"HEX TRANSFER COMPLETE ERRORS=",EOS
 		LD	A,E
 		CALL	PUT_BYTE
@@ -1801,9 +1478,10 @@ TGET_BYTE:	CALL	TGET_HEX_CHAR	;Get 1st HEX CHAR
 ;out:	CY=0, A = Value of HEX Char
 ;	CY=1, A = Received (non-hex) char or Time out
 ;-----------------------------------------------
-TGET_HEX_CHAR:	LD	A,20			;10 Second Timeout for Get char
-		CALL	TIMED_GETCHAR
-		RET	C
+TGET_HEX_CHAR:		; LD	A,20			;10 Second Timeout for Get char
+		CALL	TIMED_GETCHAR_BC	; C=1, No Char (Time Out)
+						; C=0, A = Char
+		RET	C			; Timeout. Should probably test for ESC here
 		CP	'0'
 		JP M,	TGHC_NOT_RET
 		CP	'9'+1
@@ -2317,419 +1995,6 @@ CRC_UPC		LD	A,H		;5
 ;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 ;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
 ;----------------------------------------------------------------------------------------------------; RAM TEST
-#if 0
-;B=START PAGE
-;C=END PAGE
-RAM_TEST:	CALL	SPACE_GET_BYTE
-		LD	B, A
-		CALL	SPACE_GET_BYTE
-		LD	C, A
-
-;Page March Test.  1 Sec/K
-;
-; FOR E = 00 TO FF STEP FF   'March 00 then March FF
-;   FOR H = B TO C
-;      PAGE(H) = E
-;   NEXT H
-;   FOR D = B TO C
-;      PAGE(D) = NOT E
-;      FOR H = B TO C
-;         A = E
-;         IF H = D THEN A = NOT E
-;         IF PAGE(H) <> A THEN ERROR1
-;      NEXT H
-;   NEXT D
-; NEXT E
-;
-
-		CALL	PRINTI
-		DB	CR,LF,"TESTING RAM",EOS
-		LD	E,0xFF		;E selects the polarity of the test, ie March a page of 1'S or 0's
-
-;Clear/Set all pages
-RT1_LP0		LD	H,B		;HL = BASE RAM ADDRESS
-		LD	L,0
-RT1_LP1		LD	A,E		;CLEAR A
-		CPL
-RT1_LP2		LD	(HL),A		;WRITE PAGE
-		INC	L
-		JR NZ,	RT1_LP2		;LOOP TO QUICKLY WRITE 1 PAGE
-		LD	A,H
-		INC	H		;ADVANCE TO NEXT PAGE
-		CP	C		;COMPARE WITH END PAGE
-		JR NZ,	RT1_LP1		;LOOP UNTIL = END PAGE
-
-;March 1 PAGE through RAM
-		LD	D,B		;Begin with START PAGE
-
-;Write FF to page D
-RT1_LP3		LD	H,D		;HL = Marched Page ADDRESS
-		;LD	L,0
-		CALL	ABORT_CHECK
-
-		LD	A,D
-		CPL
-;		OUT	FPLED
-		;LD	A,E		;SET A
-RT1_LP4		LD	(HL),E		;WRITE PAGE
-		INC	L
-		JR  NZ,	RT1_LP4		;LOOP TO QUICKLY WRITE 1 PAGE
-
-;Test all pages for 0 (except page D = FF)
-		LD	H,B		;HL = BASE RAM ADDRESS
-		;LD	L,0
-
-RT1_LP5		LD	A,H		;IF H = D
-		CP	D
-		LD	A,E		;THEN Value = FF
-		JR Z,	RT1_LP6
-		CPL			;ELSE Value = 00
-
-RT1_LP6		CP	(HL)		;TEST RAM
-		JP NZ,	RT_FAIL1
-		INC	L
-		JR NZ,	RT1_LP6		;LOOP TO QUICKLY TEST 1 PAGE
-		LD	A,H
-		INC	H		;ADVANCE TO NEXT PAGE
-		CP	C		;COMPARE WITH END PAGE
-		JR NZ,	RT1_LP5		;LOOP UNTIL = END PAGE
-
-;Write 00 back to page D
-		LD	H,D		;HL = Marched Page ADDRESS
-		;LD	L,0
-		LD	A,E
-		CPL
-RT1_LP7		LD	(HL),A		;WRITE PAGE
-		INC	L
-		JR NZ,	RT1_LP7		;LOOP TO QUICKLY WRITE 1 PAGE
-
-		LD	A,D
-		INC	D		;ADVANCE TO NEXT PAGE
-		CP	C		;COMPARE WITH END PAGE
-		JR NZ,	RT1_LP3		;LOOP UNTIL = END PAGE
-
-		INC	E
-		JR Z,	RT1_LP0
-
-		CALL	PRINTI
-		DB	CR,LF,"RAM PAGE MARCH PASSED",EOS
-
-
-;Byte March Test.  7 Sec/K
-;
-; FOR E = 00 TO FF STEP FF   'March 00 then March FF
-;   FOR H = B TO C
-;      PAGE(H) = E
-;      FOR D = 00 TO FF
-;         PAGE(H).D = NOT E
-;         FOR L=0 TO FF
-;            IF PAGE(H).L <> E THEN
-;               IF PAGE(H).L <> NOT E THEN ERROR2
-;               IF L<>D THEN ERROR2
-;            ENDIF
-;         NEXT L
-;      NEXT D
-;   NEXT H
-; NEXT E
-
-		LD	E,0xFF		;E selects the polarity of the test, ie March a page of 1'S or 0's
-
-;Clear/Set all pages
-
-RT2_LP0		LD	H,B		;HL = BASE RAM ADDRESS
-RT2_LP1		LD	L,0
-		CALL	ABORT_CHECK
-
-		LD	A,H
-		CPL
-;		OUT	FPLED
-
-		LD	A,E		;CLEAR A
-		CPL
-RT2_LP2		LD	(HL),A		;WRITE PAGE
-		INC	L
-		JR NZ,	RT2_LP2		;LOOP TO QUICKLY WRITE 1 PAGE
-
-
-		LD	D,0		;Starting with BYTE 00 of page
-
-RT2_LP3		LD	L,D		;Save at byte march ptr
-		LD	A,E		;SET A
-		LD	(HL),A
-
-		;LD	A,E
-		CPL			;CLEAR A
-		LD	L,0
-
-RT2_LP4		CP	(HL)		;TEST BYTE FOR CLEAR
-		JR Z,	RT2_NX1
-		CPL			;SET A
-		CP	(HL)		;TEST BYTE FOR SET
-		JP NZ,	RT_FAIL2	;IF NOT FULLY SET, THEN DEFINITELY FAIL
-		LD	A,L		;ELSE CHECK WE ARE ON MARCHED BYTE
-		CP	D
-		JP NZ,	RT_FAIL2
-		LD	A,E		;CLEAR A
-		CPL
-RT2_NX1		INC	L
-		JR NZ,	RT2_LP4		;LOOP TO QUICKLY WRITE 1 PAGE
-
-		LD	L,D		;Save at byte march ptr
-		LD	A,E
-		CPL			;CLEAR A
-		LD	(HL),A
-
-		INC	D
-		JR NZ,	RT2_LP3
-
-		LD	A,H
-		INC	H		;ADVANCE TO NEXT PAGE
-		CP	C		;COMPARE WITH END PAGE
-		JR NZ,	RT2_LP1		;LOOP UNTIL = END PAGE
-
-		INC	E
-		JR Z,	RT2_LP0
-
-		CALL	PRINTI
-		DB	CR,LF,"RAM BYTE MARCH 1 PASSED",EOS
-
-;26 Sec/K
-
-BYTEMARCH2
-		LD	E,0xFF		;E selects the polarity of the test, ie March a page of 1'S or 0's
-
-RT4_LP0		LD	D,0		;Starting with BYTE 00 of page
-
-;CLEAR all pages
-
-		LD	H,B		;HL = BASE RAM ADDRESS
-		LD	L,0
-
-RT4_LP1		LD	A,E		;CLEAR A
-		CPL
-RT4_LP2		LD	(HL),A		;WRITE PAGE
-		INC	L
-		JR NZ,	RT4_LP2		;LOOP TO QUICKLY WRITE 1 PAGE
-
-		LD	A,H
-		INC	H		;ADVANCE TO NEXT PAGE
-		CP	C		;COMPARE WITH END PAGE
-		JR NZ,	RT4_LP1		;LOOP UNTIL = END PAGE
-
-
-RT4_LP3		CALL	ABORT_CHECK
-		LD	A,D
-		CPL
-;		OUT	FPLED
-
-					;Write SET byte at "D" in every page
-		LD	H,B		;HL = BASE RAM ADDRESS
-		LD	L,D		;Save at byte march ptr
-RT4_LP4		LD	(HL),E
-
-		LD	A,H
-		INC	H		;ADVANCE TO NEXT PAGE
-		CP	C		;COMPARE WITH END PAGE
-		JR NZ,	RT4_LP4		;LOOP UNTIL = END PAGE
-
-
-		LD	L,0
-
-RT4_LP5		LD	H,B		;HL = BASE RAM ADDRESS
-		LD	A,L
-		CP	D
-		JR Z,	RT4_LP7		;Test for marked byte in all pages
-
-RT4_LP6		LD	A,E
-		CPL			;CLEAR A
-		CP	(HL)		;TEST BYTE FOR CLEAR
-		JP NZ,	RT_FAIL2
-
-		LD	A,H
-		INC	H		;ADVANCE TO NEXT PAGE
-		CP	C		;COMPARE WITH END PAGE
-		JR NZ,	RT4_LP6		;LOOP UNTIL = END PAGE
-		JR	RT4_NX
-
-RT4_LP7		LD	A,E
-		CP	(HL)		;TEST BYTE FOR SET
-		JP NZ,	RT_FAIL2
-
-		LD	A,H
-		INC	H		;ADVANCE TO NEXT PAGE
-		CP	C		;COMPARE WITH END PAGE
-		JR NZ,	RT4_LP7		;LOOP UNTIL = END PAGE
-
-RT4_NX		INC	L
-		JR NZ,	RT4_LP5
-
-					;Write CLEAR byte at "D" in every page
-		LD	H,B		;HL = BASE RAM ADDRESS
-		LD	L,D		;Save at byte march ptr
-RT4_LP8		LD	A,E
-		CPL
-		LD	(HL),A
-
-		LD	A,H
-		INC	H		;ADVANCE TO NEXT PAGE
-		CP	C		;COMPARE WITH END PAGE
-		JR NZ,	RT4_LP8		;LOOP UNTIL = END PAGE
-
-		INC	D
-		JR NZ,	RT4_LP3
-
-
-		INC	E
-		JR Z,	RT4_LP0
-
-		CALL	PRINTI
-		DB	CR,LF,"RAM BYTE MARCH 2 PASSED",EOS
-
-
-BIT_MARCH
-;Bit March Test.  0.1 Sec/K
-
-		LD	E,01		;E selects the bit to march
-
-;Clear/Set all pages
-
-RT3_LP1		LD	H,B		;HL = BASE RAM ADDRESS
-		LD	L,0
-
-		CALL	ABORT_CHECK
-
-		LD	A,E		;Display bit pattern on LED PORT
-		CPL
-;		OUT	FPLED
-
-RT3_LP2		LD	A,E		;FETCH MARCHING BIT PATTERN
-RT3_LP3		LD	(HL),A		;WRITE PAGE
-		INC	L
-		JR NZ,	RT3_LP3		;LOOP TO QUICKLY WRITE 1 PAGE
-
-		LD	A,H
-		INC	H		;ADVANCE TO NEXT PAGE
-		CP	C		;COMPARE WITH END PAGE
-		JR NZ,	RT3_LP2		;LOOP UNTIL = END PAGE
-
-		LD	H,B		;HL = BASE RAM ADDRESS
-;		LD	L,0
-
-RT3_LP4		LD	A,E		;FETCH MARCHING BIT PATTERN
-RT3_LP5		CP	(HL)
-		JP NZ,	RT_FAIL3
-		INC	L
-		JR NZ,	RT3_LP5		;LOOP TO QUICKLY WRITE 1 PAGE
-
-		LD	A,H
-		INC	H		;ADVANCE TO NEXT PAGE
-		CP	C		;COMPARE WITH END PAGE
-		JR NZ,	RT3_LP4		;LOOP UNTIL = END PAGE
-
-
-					;0000 0010
-					;...
-					;1000 0000
-
-		LD	A,E
-		RLA			;ROTATE THE 01 UNTIL 00
-		LD	A,E
-		RLCA
-		LD	E,A
-		CP	1
-		JR NZ,	RT3_NX1
-		CPL			;INVERT ALL BITS
-		LD	E,A
-		JR	RT3_LP1
-RT3_NX1		CP	0xFE
-		JR NZ,	RT3_LP1
-
-		CALL	PRINTI
-		DB	CR,LF,"RAM BIT MARCH PASSED",EOS
-
-
-
-		LD	E,01		;E selects the start sequence
-
-;Clear/Set all pages
-
-RT5_LP1		CALL	ABORT_CHECK
-
-		LD	A,E		;Display bit pattern on LED PORT
-		CPL
-;		OUT	FPLED
-
-		LD	H,B		;HL = BASE RAM ADDRESS
-		LD	L,0
-		LD	D,E
-
-RT5_LP2		INC	D
-		JR NZ,	RT5_NX1
-		INC	D
-RT5_NX1		LD	(HL),D		;WRITE PAGE
-		INC	L
-		JR NZ,	RT5_LP2		;LOOP TO QUICKLY WRITE 1 PAGE
-
-		LD	A,H
-		INC	H		;ADVANCE TO NEXT PAGE
-		CP	C		;COMPARE WITH END PAGE
-		JR NZ,	RT5_LP2		;LOOP UNTIL = END PAGE
-
-		LD	H,B		;HL = BASE RAM ADDRESS
-		;LD	L,0
-		LD	D,E
-
-RT5_LP3		INC	D
-		JR NZ,	RT5_NX2
-		INC	D
-RT5_NX2		LD	A,D
-		CP	(HL)		;TEST
-		JP NZ,	RT_FAIL5
-		INC	L
-		JR NZ,	RT5_LP3		;LOOP TO QUICKLY WRITE 1 PAGE
-
-		LD	A,H
-		INC	H		;ADVANCE TO NEXT PAGE
-		CP	C		;COMPARE WITH END PAGE
-		JR NZ,	RT5_LP3		;LOOP UNTIL = END PAGE
-
-		INC	E
-		JR NZ,	RT5_LP1
-
-		CALL	PRINTI
-		DB	CR,LF,"RAM SEQUENCE TEST PASSED",EOS
-		JP	MAIN_MENU
-
-
-RT_FAIL1	CALL	PRINTI
-		DB	CR,LF,"RAM FAILED PAGE MARCH AT:",EOS
-		CALL	PUT_HL
-		JP	MAIN_MENU
-
-RT_FAIL2	CALL	PRINTI
-		DB	CR,LF,"RAM FAILED BYTE MARCH AT:",EOS
-		CALL	PUT_HL
-		JP	MAIN_MENU
-
-RT_FAIL3	CALL	PRINTI
-		DB	CR,LF,"RAM FAILED BIT MARCH AT:",EOS
-		CALL	PUT_HL
-		JP	MAIN_MENU
-
-RT_FAIL5	CALL	PRINTI
-		DB	CR,LF,"RAM FAILED SEQUENCE TEST AT:",EOS
-		CALL	PUT_HL
-		JP	MAIN_MENU
-
-ABORT_CHECK	CALL	In_Char
-		RET C
-		CP	27
-		RET NZ
-		POP	HL			;SCRAP RETURN ADDRESS AND GO TO PARENT ROUTINE
-		CALL	PRINTI
-		DB	CR,LF,"ABORTED",EOS
-		RET
-#endif
 
 ;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 ;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
@@ -2744,36 +2009,16 @@ ABORT_CHECK	CALL	In_Char
 ;Output:	Z=1, No Key Pressed
 ;		Z=0, A=Key Pressed, bit 4 = Shift, ie, 0x97 = Shift-7
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-In_Key_Hex	LD	A,(KEY_PRESSED)
-		XOR	A
-		RET
 
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ;Select Put_Char Output
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#if 0
-LED_HOME	PUSH	HL
-		LD	HL,LED_DISPLAY
-		LD	(LED_CURSOR),HL
-		POP	HL
 
-SEL_LED		PUSH	HL
-		LD	HL,PC_LED
-		LD	(PUTCHAR_EXE),HL
-		POP	HL
-		RET
-
-SEL_RS232	PUSH	HL
-		LD	HL,PC_RS232
-		LD	(PUTCHAR_EXE),HL
-		POP	HL
-		RET
-#endif
 
 ;===============================================
 ;TIMED1_GETCHAR - Gets a character within 1 second
 ;-----------------------------------------------
-TIMED1_GETCHAR	LD	A,1
+TIMED1_GETCHAR	LD	A, 2
 
 ;===============================================
 ;TIMED_GETCHAR - Gets a character within a time limit
@@ -2782,17 +2027,18 @@ TIMED1_GETCHAR	LD	A,1
 ;	C=0, A = Char
 ;-----------------------------------------------
 
-TIMED_GETCHAR	
-#if 1
+TIMED_GETCHAR_BC
 		CALL	In_CharBC	; This is a blocking call
 		CP	A, 27		; ESC
-		JP	Z, TGC_TO
+		JP	Z, TGC_TOBC
 		OR	A		; C=0
 		RET
-TGC_TO
+TGC_TOBC
 		SCF			; C=1
 		RET
-#else
+
+
+TIMED_GETCHAR	
 		PUSH	DE
 		PUSH	BC
 		LD	D,A
@@ -2816,7 +2062,7 @@ TGC_AVAILABLE:
 		RST	10H	; Go get the character
 		CCF		; Clear C, I hope...!
 		JP	TGC_RET
-#endif
+
 ;		RET
 
 ;===============================================
@@ -2896,235 +2142,7 @@ GET_CHAR_LP	CALL	GET_CHAR_NE
 ;This secondary buffer will have the transmitted bits mixed IN with the LED Display Bytes
 ;The Interrupt is disabled only at crucial moments, but otherwise left on to accept any characters
 ;received from the RS-232 line
-#if 0
-Put_Char:
-PUT_CHAR:	PUSH	AF
-		PUSH	BC		;Save registers
-		PUSH	DE
-		PUSH	HL
-		LD	C,A		;Put character to send IN C for shifting
 
-		LD	HL,(PUTCHAR_EXE)
-		JP	(HL)
-
-;Put_Char to LED Display
-PC_LED		LD	HL,(LED_CURSOR)	;Point to LED Display Buffer
-		CP	0x20		;Test for Control/unprintable characters
-		JR	C,PCL_CTRL
-
-		LD	B, hi(LED_FONT)	;Set BC to point to LED FONT
-		RES	7,C		;Ensure ASCII 0x20-0x7F only
-		LD	A,(BC)
-		SET	7,A		;Ensure TXbit is 1
-		LD	(HL),A		;Save Character in LED_DISPLAY BUFFER
-		INC	HL
-		LD	(LED_CURSOR),HL
-		JR	PCL_RET
-
-PCL_CTRL	CP	0x0C		;<NP>
-		JR NZ,	PCLC_1
-		LD	B,8		;<NP> Clears LED Line
-		LD	A,0x80
-		LD	HL,LED_DISPLAY
-PCLC_LP		LD	(HL),A
-		INC	HL
-		DJNZ	PCLC_LP
-		JR	PCL_RETC
-
-PCLC_1		CP	0x0D		;<CR>	Control characters:
-		JR NZ,	PCL_RET
-PCL_RETC	LD	HL,LED_DISPLAY	;<CR> Returns cursor to start of LED Line
-		LD	(LED_CURSOR),HL
-PCL_RET		JP	PC_RETPOP
-
-
-
-;Put_Char to RS232
-PC_RS232	LD  HL,LED_DISPLAY_SB
-				;Copy 10 bytes from the LED_DISPLAY buffer (MOD 8) to the secondary buffer
-PC_REDO		LD  DE,(SCAN_PTR)   ;SCAN_PTR holds the next LED BYTE @ OUTPUT.
-		LD  B,E		;Save SCAN_PTR for test if an Interrupt occurs
-
-		LD  A,(DE)
-		LD  (HL),A
-		RES 7,(HL)	;Configure Start BIT (msb) to be 0
-
-		INC L
-				;Shift next 9 bits IN this loop,
-PC_LP0		INC E
-		RES 3,E		;Bound DE to the 8 bytes of LED_DISPLAY
-
-		LD  A,(DE)
-		RLA		;Bump OUT msb
-		RRC C		;Fetch Data BIT (non destructive shifting incase of REDO)
-		RR  A		;Shift IN Data BIT
-		LD  (HL),A
-		INC L
-		JR  NZ,PC_LP0
-
-		DEC L
-		SET 7,(HL)	;Stop Bit
-
-		LD  L, lo(LED_DISPLAY_SB)  ;Restart Pointer to Secondary Buffer
-
-				;Test if SCAN_PTR Changed (due to ISR)
-		LD  E,5		;Preload RX delay counter (incase of RX byte during TX)
-		LD  D,0x80	;Preload RxD Register with A marker BIT (to count 8 data bits)
-
-		DI		;STOP INTERRUPTS HERE to see if SCAN_PTR has changed (due to Timer Interrupt)
-		LD  A,(SCAN_PTR) ;Adjust working scan pointer (counted to 10 mod 8, so subtract 2 to restore)
-		XOR B
-		JR  Z,PC_0
-				;If SCAN_PTR changed, Redo the Secondary Buffer
-		EI		;Allow Interrupts again while preparing Secondary Buffer
-		RLC C		;ADJUST Transmitted bits due to 9 bits shifted (back up 1 BIT)
-		JR  PC_REDO
-;- - - - - - - - - - - - - - - - - - - - - Transmit the BYTE here....
-;1 Bit time at 9600 = 416.6666 cycles
-
-PC_0		LD  C,Port40
-
-PC_1		LD  A,(HL)	;7	Send BIT
-		OUT (Port40),A	;11
-		LD  B,8		;7
-
-PC_2		IN  A,(C)	;12	;While waiting, Poll for RX DATA Start bit
-		JP  P,PC_5	;10 tc (Note 1.JP)
-		LD  A,(0)	;13 tc NOP
-PC_3		DJNZ PC_2	;13/8  ;48 IN loop (-5 on last itteration).  48 * 8 + 39 - 5 = 418 tc per BIT
-
-		INC L		;4
-		JP  NZ,PC_1	;10	;39 TC Overhead to send BIT
-		JP  PC_RET
-
-PC_4		SRL B		;4	If false start bit detected, Divide B by 2 and return to simple tx
-		JP  NZ,PC_3	;10
-		INC L		;4
-		JP  Z,PC_RET	;10
-		LD  A,(HL)	;7	Send BIT
-		OUT (Port40),A	;11
-		JP  PC_2	;10
-
-
-				;Here an RX byte was detected while transmitting.
-				;Delay IN detection could be as much as 60tc, we will assume 1/2 (=30tc)
-				;We need to test Start Bit @ 208tc,
-				;We are juggling TX & RX. TX will occur earlier than BIT time due to shorter loop delay
-PC_5		INC  L		;4
-		DEC  B		;4
-		JP Z,PC_7	;10
-		SLA  B		;8      Multiply B by 2 for 24 cycle loop
-PC_6		DEC  E		;4	RxBit Timing
-		JR   Z,PC_9	;7/12   ;Either before OR after sending A BIT, we will branch OUT of loop here to check for RX Start Bit
-		DJNZ PC_6	;13/8 tc TxBit Timing
-				;		24 tc Loop
-;TxBit
-PC_7	       	LD  B,13	;7
-		XOR A		;4
-		OR  L		;4
-		JR  Z,PC_8	;7/12	;Stop sending if L=0
-		LD  A,(HL)	;7	;39 to send next BIT
-		OUT (Port40),A	;11
-		INC L		;4
-PC_8		JP  PC_6	;10 tc (Note 1.JP)
-
-				;Test if Start Bit is good (at ~1/2 BIT time)
-PC_9		LD  E,5		;7   E=5 incase we have a bad start bit and have to return to simple TX
-		IN  A,(C)	;12  Re-TEST Start Bit at 1/2 bit time
-		JP  M,PC_4	;10  If Start BIT not verified, then return to simple TXD (return at point where we are Decrementing B to minimize diff)
-		LD  E,15	;7   Adjust initial sampling delay (as per timing observed)
-
-
-				;At this point, we have good start BIT, 1 OR more TX bits left to go...  here's where timing is accurate again
-				;We will go through each TXbit AND RXBit once during the full BIT time.  So the time of these routines are added
-PC_10		DEC E		;4
-		JR  Z,PC_14	;7/12
-PC_11		DJNZ PC_10	;13/8 tc    24Loop= 6uSec
-
-				; TX= S 0 1 2 3 4 5 6 7 S
-				; RX=  S 0 1 2 3 4 5 6 7 S  <-It's possible to receive all 8 data bits before sending Stop Bit
-;TxBit ;54tc to Send BIT
-		XOR A		;4
-		OR  L		;4
-		JR  Z,PC_13	;7/12	;Stop sending if L=0
-		LD  A,(HL)	;7
-		OUT (Port40),A	;11
-		INC L		;4
-PC_12        	LD  B,13	;7     (417 - 54 - 51)/24 = 13 counts required to pace 1 BIT
-		JP  PC_10	;10 tc (Note 1.JP)
-
-PC_13		LD  B,13	;7     (7tc NOP)
-		JP  PC_12	;10 tc (Note 1.JP)
-
-;RxBit ;51tc to Receive BIT
-PC_14		IN   A,(Port40)	;11	Fetch RXbit
-		NOP		;4
-		RLCA		;4	put IN CARRY
-		RR    D		;8	shift into RxD
-		LD    E,13	;7      (417 - 54 - 51)/24 = 13 counts required to pace 1 BIT
-		JR C, PC_15	;7/12	;Test for marker BIT shifting OUT of D
-		JP    PC_11	;10	RXBIT = 40tc
-
-PC_15		NOP		;4
-PC_16		DEC  E		;4
-		JR Z,PC_19	;7/12
-		DJNZ PC_16	;13/8 tc    24Loop= 6uSec
-
-				; TX= S 0 1 2 3 4 5 6 7 S
-				; RX=  S 0 1 2 3 4 5 6 7 S  <-It's possible to receive all 8 data bits before sending Stop Bit
-;TxBit ;54tc to Send BIT
-		XOR  A		;4
-		OR   L		;4
-		JR Z,PC_18	;7/12	;Stop sending if L=0
-		LD   A,(HL)	;7
-		OUT (Port40),A	;11
-		INC  L		;4
-PC_17        	LD   B,13	;7     (417 - 54 - 51)/24 = 13 counts required to pace 1 BIT
-		JP   PC_16	;10 tc (Note 1.JP)
-
-PC_18		LD   B,13	;7     (7tc NOP)
-		JP   PC_17	;10 tc (Note 1.JP)
-
-
-
-;RxBit ;51tc to Receive BIT
-PC_19		IN  A,(Port40)	;11	Fetch Stop BIT
-		RLCA		;4	put IN CARRY
-		JP C,PC_20
-		LD   HL,RX_ERR_STOP
-		CALL TINC
-
-PC_20		LD  A,D		;Fetch received byte to RX Buffer
-		LD  HL,(RXBHEAD)
-		INC L
-		LD  (RXBHEAD),HL ;Head = Head + 1
-		LD  (HL),A	;Stuff into RX BUFFER
-		LD  A,(RXBTAIL)
-		CP  L
-		JR  NZ,PC_RET	;Jump if NOT Zero = No Over run error (Head <> Tail)
-		INC A		;Else
-		LD  (RXBTAIL),A	;Tail = Tail + 1
-		LD   HL,RX_ERR_OVR ;Count Over Run Error
-		CALL TINC
-
-PC_RET		IN	A,(Port40)	;Resync the SCAN_PTR
-		INC	A
-		AND	7
-		OR  lo(LED_DISPLAY)
-		LD	L,A
-		LD	(SCAN_PTR),A	;Save Scan Ptr @ Next Scan Output
-		LD	H, hi(SCAN_PTR)
-		LD	A,(HL)
-		LD	(SCAN_LED),A	;Save for next interrupt
-PC_RETF		EI
-
-
-PC_RETPOP	POP HL
-		POP DE
-		POP BC
-		POP AF
-		RET
-#endif
 ;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 ;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
 ;	Chapter 11	ISR.  RS-232 Receive, LED & Keyboard scanning, Timer tic counting
@@ -3178,1014 +2196,13 @@ PC_RETPOP	POP HL
 ;
 ;					;42 to get here from ORG 38h
 ;		;PUSH	HL = HL is pushed before getting here
-#if 0
-ISR_INT		PUSH	AF		;11	Quickely now, determine cause of Interrupt
-		IN	A,(Port40)	;11
-		RLCA			;4
-		JP	NC,ISR_RXD	;10	Jump ASAP if RS-232 byte coming in.
-		RLCA			;4
-		JP	C,ISR_TIMER	;10 (st=50) Jump if Timer interrupt
-		LD	A,0x80		;	Otherwise, unknown interrupt (RS-232 noise?)
-		OUT	(Port40),A	;11	Just reset Timer interrupt, just incase?
-		POP	AF
-		POP	HL
-		EI
-		RETI
 
-;
-;- - - - - - - - - - - - - - RS-232 Receive BYTE
-;
-;1 Bit time at 9600 = 416.6666 cycles	;We get here ~@88 tc
-ISR_RXD		PUSH BC		;11
-		LD   HL,RX_ERR_LDRT ;10
-		LD   B,5		;7
-IRXD_VS		IN   A,(Port40)	;11	;Sample Start BIT @116, 151, 186, 221, 256 tc
-		RLCA		;4	;(Actual sampling occurs 9 OR 10 tc later)
-		JR   C,IRXD_BAD	;7/12
-		DJNZ IRXD_VS	;13/8
-				;35tc per loop
-				;@286 when we come OUT of loop
-				;Must delay 625 to reach middle of 1st data BIT
-				;Need another 350 Delay
-
-		LD   B,25	;7	;Delay loop after START Bit
-		DJNZ $		;13/8	Delay loop = 25 * 13 - 5 = 356
-		NOP		;4
-		LD   L,8	;7
-				;@624	;Loop through sampling 8 data bits
-IRXD_NB		IN   A,(Port40)	;11	;Sample BIT
-		RLCA		;4	;Get BIT
-		RR   H		;8	;Shift IN
-		DEC  L		;4	;Count down 8 bits
-	;	JR   Z,IRXD_DD	;7/12
-
-		JR  Z,IRXD_SAVE	;7/12	Optional to finish receiving byte here AND ignore framing errors
-				;	(Replace the previous condital jump with IRXD_SAVE destination).
-
-IRXD_NI		LD  A,23	;7	;Delay loop between data bits
-		DEC A		;4
-		JR  NZ,$-1	;12/7	;Delay loop = 16 * 23 + 53 - 5 = 416
-		JR  IRXD_NB	;12	;Total Overhead = 53
-				;Time to get all data bits = 416 * 7 + 39 = 2951 (last BIT does not get full delay)
-				;@3576  (we wish to sample stop BIT @3958) (need to delay another 382)
-IRXD_DD		LD  A,23	;7	;Delay loop before STOP BIT
-		DEC A		;4
-		JR  NZ,$-1	;12/7	;Delay loop =
-		IN  A,(Port40)	;11	;NOP for 11tc
-		IN  A,(Port40)	;11	;Sample Stop BIT @3957
-		OR  A		;4	;(Actual sampling occurs 9 OR 10 tc later)
-		JP  P,IRXD_BAD_STOP ;
-
-
-IRXD_SAVE	LD  A,H		;4	;Fetch received byte
-		LD  HL,(RXBHEAD) ;16	;Advance Head Ptr of RX Buffer, Head = Head + 1
-		INC L		;4
-		LD  (RXBHEAD),HL ;16
-		LD  (HL),A	;7	;Save Received byte into RX Buffer
-		LD  A,(RXBTAIL)	;13	;Test if buffer has over ran
-		CP  L		;4	;If Tail = Head Then Tail = Tail + 1 & Flag overrun
-		JR  NZ,IRXD_RET	;12/7
-		INC A
-		LD  (RXBTAIL),A
-
-IRXD_OVR	LD   HL,RX_ERR_OVR
-		JR   IRXD_BAD
-IRXD_BAD_STOP	LD   HL,RX_ERR_STOP
-IRXD_BAD	CALL TINC
-
-IRXD_RET	LD	A,(SCAN_LED)	;13 ZMC-Display Refresh / Reset Int
-		OUT	(Port40),A	;11 Output ASAP to satisfy Interrupt Flag
-
-		IN	A,(Port40)	;Resync the SCAN_PTR
-		INC	A
-		AND	7
-		OR  lo(LED_DISPLAY)	;LED_DISPLAY is at xxEO (it's ok to overlap in this order)
-		LD	(SCAN_PTR),A	;Save Scan Ptr @ Next Scan Output
-		LD	HL,(SCAN_PTR)	;Fetch next byte to output
-		LD	A,(HL)
-		LD	(SCAN_LED),A	;Save for next interrupt
-
-		POP BC		;10
-		POP AF		;10
-		POP HL		;10
-		EI		;4
-		RETI		;14
-
-;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - Timer Tics
-;Refresh next LED Display		;92 to get here from Int.
-ISR_TIMER	LD	A,(SCAN_LED)	;13 ZMC-Display Refresh / Reset Int
-		OUT	(Port40),A	;11 Output ASAP to satisfy Interrupt Flag
-		EI			;4  Allow RXD interrupts
-					;st=28
-
-		IN	A,(Port40)	;11 Resync the SCAN_PTR
-		INC	A		;4  Advance to next column to match column after next OUT
-		AND	7		;7
-		OR  lo(LED_DISPLAY)	;7  LED_DISPLAY is at xxEO (it's ok to overlap in this order)
-		LD	(SCAN_PTR),A	;13 Save Scan Ptr @ Next Scan Output
-		LD	HL,(SCAN_PTR)	;16 Fetch next byte to output
-		LD	A,(HL)		;7
-		LD	(SCAN_LED),A	;13 Save for next interrupt
-					;st=78
-
-;Halt Test
-		LD	HL,4		;10 Get PC
-		ADD	HL,SP		;11
-		CALL	LD_HL_HL	;17+43
-		DEC	HL		;6
-		LD	A,(HL)		;7 Fetch Previous Instruction
-		CP	0x76		;7 Is HALT?
-		JP  Z,	ICMD_BREAK_RET	;10
-					;st=111
-
-;Tic counter - Advance
-		LD	HL,(TicCnt)	;16 Advance Timer Counter
-		INC	HL		;6
-		LD	(TicCnt),HL	;16
-					;st=38
-
-;Keyboard / Display Update / Keyboard Commands or Entry
-		LD	A,L		;4  Test timer for ZMC Keyboard Read.  Inputs keyboard at LED scan rate on every 4th complete scan
-		AND	0x18		;7  Scan when timer is xxx0 0xxx, ie, 8 consecutive columns every 32mSec.
-		JP  NZ,	IKEY_SCAN_END	;10
-					;st=21
-
-;-Keyboard Scanning
-;	KeyPad	  Code	     Returned
-;	 Key	  Value	       in A
-;	no-key	1111 1111
-;	  0	1111 1110	0	Bit 0 and 4 indicate key down in that group
-;	  1	1111 1100	1	Bits 1-3 and 5-7 encode a key down in that group
-;	  2	1111 1010	2	All logic is inverted
-;	  3	1111 1000	3
-;	  4	1111 0110	4
-;	  5	1111 0100	5
-;	  6	1111 0010	6
-;	  7	1111 0000	7
-;
-;	  8	1110 1111	8
-;	  9	1100 1111	9
-;	  +	1010 1111	10
-;	  -	1000 1111	11
-;	  *	0110 1111	12
-;	  /	0100 1111	13
-;	  #	0010 1111	14
-;	  .	0000 1111	15
-
-		IN	A,(Port40)	;11 Read KEY down & ScanPtr
-		LD	HL,KBHEXSAMPLE	;10
-
-		BIT 	3,A		;8  Test ROW-0
-		JR  NZ,	IKEY0_UP	;12 Jump if key UP
-		AND	7
-		OR	0x80
-		LD	(HL),A		;Save HEX key
-		RLCA
-		INC	L		;
-		OR	(HL)
-		LD	(HL),A		;Save Octal key to KBOCTSAMPLE
-		DEC	L
-		IN	A,(Port40)	;Read KEY down & ScanPtr
-IKEY0_UP
-		BIT 	4,A		;8 Test ROW-1
-		JR  NZ,	IKEY1_UP	;12 Jump if key UP
-		AND	7
-		OR	0x88
-		LD	(HL),A		;Save HEX key
-		RLCA
-		RLCA
-		RLCA
-		RLCA
-		RLA			;last shift in from Carry to clear lsb
-		INC	L		;
-		OR	(HL)
-		LD	(HL),A		;Save Octal key to KBOCTSAMPLE
-		DEC	L
-		IN	A,(Port40)	;Read KEY down & ScanPtr
-IKEY1_UP
-
-		OR	0xF8		;7  Test for Column 7
-		INC	A		;4
-		JP  NZ,	IKEY_SCAN_END	;10
-
-;Keys and Display update on Column 7 Only
-
-		IN	A,(Port40)	;11 Read F KEY down
-		BIT 	5,A		;8  Test F KEY
-		JR  Z,	IKEYF_UP	;12 Jump if key UP
-		LD	A,(KEYBFMODE)	;Check the F MODE (shift key or HEX key)
-		OR	(HL)
-		LD	(HL),A		;Save HEX key
-		LD	A,0xF0
-		INC	L		;
-		OR	(HL)
-		LD	(HL),A		;Save Octal key to KBOCTSAMPLE
-		DEC	L
-IKEYF_UP
-		INC	L		;4
-		LD	A,(HL)		;7  Save Octal Key Code at end of scan
-		CPL			;4
-		INC	L		;4
-		LD	(HL),A		;7  Save to KEY_OCTAL
-		DEC	L		;4
-		XOR	A		;4
-		LD	(HL),A		;7  Zero KBOCTSAMPLE for next scan
-
-		DEC	L		;4
-		LD	A,(HL)		;7  Get new HEX sample
-		LD	(HL),0		;10 Zero KBHEXSAMPLE for next scan
-
-IKEY_DEBOUNCE	;A=current key scan or 0x00 for no key.
-		LD	HL,(KEYBSCANPV) ;16 Get previously saved scaned key and timer
-		CP	L		;4
-		JR  Z,	IKEYP_NCOS	;12 Jump if NO Change of State
-		LD	H,3		;Timer = 3 (Controls how sensitive the keyboard is to Key Inputs)
-		LD	L,A		;Previous scan=current scan
-
-IKEYP_NCOS	DEC	H		;4
-		LD	(KEYBSCANPV),HL	;16 Save previous scan & timer
-		JP  Z,	IKEYP_EVENT	;10
-		JP  P,	IK_NOKEY_EVENT	;10  st=165
-
-		LD	A,0xD0		;Sets when to repeat (closer to FF, faster)
-		CP	H
-		JP  NZ, IK_NOKEY_EVENT
-
-		LD	A,0xD4		;Sets how fast to repeat (closer to "when to repeat" faster)
-		LD	(KEYBSCANTIMER),A ;Save timer
-		LD	A,L
-
-IKEYP_EVENT	;A=current key scan or 0x00 for no key (either after debounce or as repeat)
-		LD	HL,KEY_PRESSED	;Point HL to previously saved/processed Key
-		OR	A
-		JP  Z,	IK_KEYUP_EVENT
-		
-IKEYP_EVENT_DN				;When A<>0, It's a KEY DOWN EVENT
-		CP	0x90		;Is it Shift key down?
-		JP  NZ,	IK_KEYDN_EVENT	;Jump to process key down if it's NOT a shift key
-					;Special consideration given here for Shift Key down.
-		BIT	4,(HL)		;Test bit 4 of KEY_PRESSED (previously saved/processed key)
-		LD	(HL),A		;Save the 0x90 to KEY_PRESSED
-		JP  Z,	IKEY_DONE	;If previously saved key was not a shifted key, keep the 0x90
-		DEC	(HL)		;Otherwise, reduce the shift key to a simple "F" key
-		JP	IKEY_DONE
-
-IK_KEYUP_EVENT	;*************************************************** KEY UP EVENT
-					;When A=0, It's a KEY UP EVENT
-		LD	A,(HL)		;Fetch the previous key down code
-		CP	0x90
-		JP  NZ,	IKEY_DONE	;Exit if not the shift key going up
-					;Otherwise, if it was the shift key going up....
-		LD	A,0x8F		;replace it with a simple "F" key
-		;JP	IK_KEYDN_EVENT	;and execute the key down event.
-
-IK_KEYDN_EVENT	;*************************************************** KEY DOWN EVENT
-		LD	(HL),A		;Save Last Key Down (for Shift Testing)
-
-		LD	HL,LED_ANBAR
-		SET	0,(HL)
-		LD	HL,BEEP_TO
-		SET	1,(HL)		;Time out beep in 2 counts
-
-		LD	HL,(KEY_EVENT)
-		JP	(HL)
-
-IK_NOKEY_EVENT	;*************************************************** NO KEY EVENT
-
-		LD	HL,(CTRL_C_CHK)	;16 <Ctrl>-C check +77
-		JP	(HL)		;4
-					;st=97
-CTRL_C_RET
-
-		LD	HL,IK_TIMER	;10
-		LD	A,(HL)		;7 Time out any pending Monitor Input
-		OR	A		;4
-		JP Z,	IKEY_DONE	;10 st=31
-		DEC	(HL)
-		JP NZ,	IKEY_DONE
-					;IK Timer Expired Event
-IKC_RESET_CMD				;Upon time out, return monitor to CMD input
-		LD	HL,(LDISPMODE)
-		LD	(DISPMODE),HL
-		LD	HL,IMON_CMD
-		LD	(KEY_EVENT),HL
-		LD	HL,KEYBFMODE	;Shiftable Keyboard
-		LD	(HL),0x90
-
-IKC_REFRESH	LD	A,(ANBAR_DEF)	;Refresh Display
-		OR	1		;Assume Sounder is ON, Time Out routine below will correct
-		LD	(LED_ANBAR),A
-IKR_QREFRESH	LD	A,-1
-		LD	(IK_HEXST),A	;Zero HEX Input Sequencer
-		LD	A,1		;Force Quick Refresh of Label
-		LD	(DISPLABEL),A
-		;JP	IKEY_DONE
-
-
-IKEY_DONE
-		;*************************************************** UP DATE LED DISPLAY
-		LD	HL,(DISPMODE)	;16 +242 (for Display Memory)
-		JP	(HL)		;4
-IDISP_RET
-
-		LD	HL,BEEP_TO	;10
-		DEC	(HL)		;11
-		JP NZ,	IKEY_SCAN_END	;10
-		INC	(HL)		;11
-		LD	HL,LED_ANBAR	;10
-		RES	0,(HL)		;15
-					;st=67
-
-IKEY_SCAN_END	LD	HL,ISR_TIMER_RET ;10 Set return address
-		PUSH	HL		;11
-		LD	HL,(UiVec)	;16
-		JP	(HL)		;4
-					;st=41
-
-ISR_TIMER_RET	POP	AF		;10
-		POP	HL		;10
-		RETI			;14
-					;st=34
-
-UiVec_RET	RET			;Default Return for UiVec
-
-
-ICMD_BREAK	LD	A,0xFE
-ICMD_BREAK_RET	LD	(SOFT_RST_FLAG),A
-		LD	A,(GET_REG)	;Soft Restart only allowed while not in Monitor Mode
-		CP  lo(GET_REG_MON)
-		JP  Z,	IKEY_DONE
-		POP	AF
-		LD	HL,0
-		EX	(SP),HL	;POP HL, PUSH 0000
-		RETI		;RETI to 0000 (with PC on stack)
-
-
-		;Stack holds:
-		;SP	AF
-		;SP+2	HL
-		;SP+4	RETURN TO MAIN CODE (PC)
-
-CTRL_C_TEST	LD	HL,(RXBHEAD)	;16
-		LD	A,(HL)		;7
-		LD	HL,CTRL_C_TIMER	;10
-		CP	3		;7
-		JP  Z,	CTRL_C_IN_Q	;10
-		LD	(HL),10		;10
-CTRL_C_IN_Q	DEC	(HL)		;7
-		JP  NZ,	CTRL_C_RET	;10  st=77
-		LD	A,0xCC
-		JP	ICMD_BREAK_RET
-
-CTRL_C_CHK_ON	LD	HL,CTRL_C_TEST
-		LD	(CTRL_C_CHK),HL
-		RET
-CTRL_C_CHK_OFF	LD	HL,CTRL_C_RET
-		LD	(CTRL_C_CHK),HL
-		RET
-
-
-
-;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
-;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
-;	Keyboard Monitor
-;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
-;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
-
-;============================================================================
-;	IMON - Monitor Loop
-;
-; This is the main executive loop for the Front Panel Emulator, Dispatch the Command
-;============================================================================
-IMON_CMD	LD	HL,IMON_TBL
-		AND	0x1F
-		RLCA			;X2
-		CALL	ADD_HL_A
-		CALL	LD_HL_HL	; HL = (HL)
-		JP	(HL)
-
-IMON_TBL	DW	ICMD0
-		DW	IKEY_DONE	;ICMD1
-		DW	IKEY_DONE	;ICMD2
-		DW	IKEY_DONE	;ICMD3
-		DW	GO_EXEC		;ICMD4
-		DW	ICMD5
-		DW	ICMD6
-		DW	ICMD7
-		DW	IKEY_DONE	;ICMD8
-		DW	IKEY_DONE	;ICMD9
-		DW	ICMDA
-		DW	ICMDB
-		DW	IKEY_DONE	;ICMDC
-		DW	ICMDD
-		DW	ICMDE
-		DW	IKEY_DONE	;ICMDF
-		DW	IKEY_DONE	;ICMD10 (Shift-0 Can't happen)
-		DW	IKEY_DONE	;ICMD11
-		DW	IKEY_DONE	;ICMD12
-		DW	IKEY_DONE	;ICMD13
-		DW	IKEY_DONE	;ICMD14
-		DW	IKEY_DONE	;ICMD15
-		DW	IKEY_DONE	;ICMD16
-		DW	IKEY_DONE	;ICMD17
-		DW	IKEY_DONE	;ICMD18
-		DW	IKEY_DONE	;ICMD19
-		DW	IKEY_DONE	;ICMD1A
-		DW	IKEY_DONE	;ICMD1B
-		DW	IKEY_DONE	;ICMD1C
-		DW	IKEY_DONE	;ICMD1D
-		DW	ICMD_BREAK	;ICMD1E
-		DW	IKEY_DONE	;ICMD1F (Shift-F Can't happen)
-
-ICMD0		CALL	WRITE_BLOCK
-		DW	LDISPMODE	;Where to write
-		DW	7		;Bytes to write
-		DW	IDISP_REG	;(LDISPMODE)
-		DW	IDISP_REG	;(DISPMODE)
-		DW	ICMD0_R		;(KEY_EVENT) Switch to HEX Input Mode
-		DB	80		;(IK_TIMER)
-		LD	HL,LED_ANBAR
-		SET	6,(HL)
-		JP	IKEY_DONE
-
-ICMB_REG	LD      A,(RegPtr)
-ICMD0_R		DEC	A		;Adjust so Key 1 = 0 = SP
-		AND	0xF
-ICMD_SET_REG	CP	13
-		JR  C,	ICMD_SR_OK
-		XOR	A
-ICMD_SR_OK	LD	(RegPtr),A
-		JP	IKC_RESET_CMD
-
-ICMDE		CALL	WRITE_BLOCK
-		DW	LDISPMODE	;Where to write
-		DW	14		;Bytes to write
-		DW	IDISP_MEM	;(LDISPMODE)
-		DW	IDISP_MEM	;(DISPMODE)
-		DW	ICMD_WORD	;(KEY_EVENT) Switch to HEX Input Mode
-		DB	80		;(IK_TIMER)
-		DB	0x8F		;(KEYBFMODE) HEX Keyboard Mode (F on press)
-		DB	0		;(DISPLABEL)
-		DB	-1		;(IK_HEXST)
-		DW	LED_DISPLAY	;(HEX_CURSOR) @d1
-		DW	HEX2ABUSS	;(HEX_READY)
-
-		LD	HL,LED_ANBAR
-		SET	5,(HL)
-		JP	IKEY_DONE
-
-
-ICMD_WORD	CALL	LED_PUT_HEX
-		LD	HL,IK_HEXST
-		INC	(HL)
-		JR NZ,	ICMD_WORDN1	;Do 1st digit
-
-		LD	HL,(DISPMODE)
-		LD	(LDISPMODE),HL
-		LD	HL,IDISP_RET
-		LD	(DISPMODE),HL	;No Display Update while HEX Input Mode
-
-		LD	HL,(HEX_CURSOR)
-		LD	A,0x81		;Underscore
-		LD	(HL),A		;Display X _
-		INC	HL
-		LD	(HL),A		;Display X _ _
-		INC	HL
-		LD	(HL),A		;Display X _ _ _
-		LD	HL,IK_HEXH	;HL=DIGITS 1&2
-		JR	ICMD_WORD1
-
-ICMD_WORDN1	LD	A,(HL)
-		LD	HL,IK_HEXH	;HL=DIGITS 1&2
-		DEC	A
-		JR Z,	ICMD_WORD2	;Do 2nd digit
-		LD	HL,IK_HEXL	;HL=DIGITS 3&4
-		DEC	A
-		JR NZ,	ICMD_WORD2
-
-ICMD_WORD1	LD	A,(KEY_PRESSED)	;1st & 3rd DIGIT
-		RRD
-		JR	ICMD_WORD_RET
-
-ICMD_WORD2	RRD			;2nd & 4th DIGIT
-		LD	A,(KEY_PRESSED)
-		RLD
-
-ICMD_WORD_RET	LD	A,160
-		LD	(IK_TIMER),A	;Set Time out on Register Selection
-		LD	A,(IK_HEXST)	;Advance to next DspMod
-		CP	3
-		JP NZ,	IKEY_DONE
-		LD	HL,(HEX_READY)
-		JP	(HL)
-
-HEX2ABUSS	LD	HL,(IK_HEXL)
-		LD	(ABUSS),HL
-		JP	IKC_RESET_CMD
-
-HEX2REG		LD	A,(RegPtr)	;Select Register
-		PUSH	DE
-		LD	DE,(IK_HEXL)
-		CALL	PUT_REGISTER
-		POP	DE
-		JP	IKC_RESET_CMD
-
-
-ICMD_BYTE	CALL	LED_PUT_HEX
-		LD	HL,IK_HEXST
-		INC	(HL)
-		JR NZ,	ICMD_BYTE2	;Do 1st digit
-
-		LD	HL,(DISPMODE)
-		LD	(LDISPMODE),HL
-		LD	HL,IDISP_RET
-		LD	(DISPMODE),HL	;No Display Update while HEX Input Mode
-
-		LD	HL,(HEX_CURSOR)
-		LD	A,0x81		;Underscore
-		LD	(HL),A		;Display X _
-
-		LD	HL,IK_HEXH	;HL=DIGITS 1&2
-		LD	A,(KEY_PRESSED)	;1st DIGIT
-		RRD
-		LD	A,160
-		LD	(IK_TIMER),A	;Set Time out on Register Selection
-		JP 	IKEY_DONE
-
-ICMD_BYTE2	LD	HL,IK_HEXH	;HL=DIGITS 1&2
-		RRD			;2nd DIGIT
-		LD	A,(KEY_PRESSED)
-		RLD
-		LD	A,(HL)
-		LD	HL,(HEX_READY)
-		JP	(HL)
-
-HEX2IN_Ptr	LD	(IoPtr),A	;Save Byte input to IoPtr
-		JP	IKC_RESET_CMD
-
-HEX2OUT_Ptr	LD	(IoPtr),A	;Save Byte input to IoPtr
-		JP	ICMD_IO_OUT
-
-HEX2MEM		LD	HL,(ABUSS)
-		LD	(HL),A
-		INC	HL
-		LD	(ABUSS),HL
-		JP	ICMD_AMEM
-
-HEX2OUT_PORT	PUSH	BC
-		LD	B,A
-		LD	A,(IoPtr)
-		LD	C,A
-		OUT	(C),B
-		POP	BC
-		JP	ICMD_IO_OUT
-
-ICMD1
-ICMD2
-ICMD3
-ICMD4
-
-ICMD5		CALL	WRITE_BLOCK
-		DW	LDISPMODE	;Where to write
-		DW	14		;Bytes to write
-		DW	IDISP_IN	;(LDISPMODE)
-		DW	IDISP_IN	;(DISPMODE)
-		DW	ICMD_BYTE	;(KEY_EVENT) Switch to BYTE Input Mode
-		DB	80		;(IK_TIMER)
-		DB	0x8F		;(KEYBFMODE) HEX Keyboard Mode (F on press)
-		DB	0		;(DISPLABEL)
-		DB	-1		;(IK_HEXST)
-		DW	LED_DISPLAY+2	;(HEX_CURSOR) @d3
-		DW	HEX2IN_Ptr	;(HEX_READY)
-
-		LD	HL,LED_ANBAR
-		SET	5,(HL)
-		JP	IKEY_DONE
-
-ICMD6		CALL	WRITE_BLOCK
-		DW	LDISPMODE	;Where to write
-		DW	14		;Bytes to write
-		DW	IDISP_OUT	;(LDISPMODE)
-		DW	IDISP_OUT	;(DISPMODE)
-		DW	ICMD_BYTE	;(KEY_EVENT) Switch to BYTE Input Mode
-		DB	80		;(IK_TIMER)
-		DB	0x8F		;(KEYBFMODE) HEX Keyboard Mode (F on press)
-		DB	0		;(DISPLABEL)
-		DB	-1		;(IK_HEXST)
-		DW	LED_DISPLAY+2	;(HEX_CURSOR) @d3
-		DW	HEX2OUT_Ptr	;(HEX_READY)
-
-		LD	HL,LED_DISPLAY+5
-		LD	(HL),0x80	;Blank d6
-		INC	HL
-		LD	(HL),0x80	;Blank d7
-		LD	HL,LED_ANBAR
-		SET	5,(HL)
-		JP	IKEY_DONE
-
-;============================================================================
-;	Single Step
-;============================================================================
-ICMD7		LD	A,(GET_REG)	;Single step only allowed while in Monitor Mode
-		CP  lo(GET_REG_MON)
-		JP  NZ,	IKEY_DONE
-
-GO_SINGLE	XOR	A
-		LD	(SOFT_RST_FLAG),A ;Clear flag for next ISR with junk in A
-		LD	HL,ISINGLE	;Redirect next Interrupt to Single Step
-		LD	(INT_VEC),HL
-		HALT			;Halt for next interrupt (Aligns TC with INT)
-
-					;On the next interrupt, handle it here
-					;42 (+ complete last instruction time)
-ISINGLE		PUSH	AF		;11
-		LD	A,(SCAN_LED)	;13 ZMC-Display Refresh / Reset Int
-		OUT	(Port40),A	;11 Output ASAP to satisfy Interrupt Flag
-
-		IN	A,(Port40)	;11 Resync the SCAN_PTR
-		INC	A		;4  Advance to next column to match column after next OUT
-		AND	7		;7
-		OR  lo(LED_DISPLAY)	;7  LED_DISPLAY is at xxEO (it's ok to overlap in this order)
-		LD	(SCAN_PTR),A	;13 Save Scan Ptr @ Next Scan Output
-		LD	HL,(SCAN_PTR)	;16 Fetch next byte to output
-		LD	A,(HL)		;7
-		LD	(SCAN_LED),A	;13 Save for next interrupt
-
-		LD	HL,SOFT_RST_FLAG ;10 Is ISR being re-entered after the single step?
-		LD	A,0xD1		;7
-		CP	(HL)		;7
-		JP Z,	ICMD_BREAK_RET	;10 Jump if yes.
-		LD	(HL),A		;7  Else, set flag for next ISR
-		LD	A,230		;7
-					;203 (+completion), There are 4096 cycles between interrupts.
-					;	 4096 cycles to waste
-					;	 -203 cycles to get here
-					;	 -660 cycles to execute
-					;	=3233 cycles more to waste
-					;
-					;	Waste Loop = 14 * 230 + 13 = 3233
-					;
-ISINGLE_LP	DEC	A		;4  Count down the cycles to time the next ISR to occur
-		JP NZ,	ISINGLE_LP	;10 cycle after execution commences
-		ADC	HL,HL		;15
-		JP	GO_EXEC		;10 Go Execute the single instruction!
-					;(650 T states until executing next instruction)
-
-ICMD8
-ICMD9
-
-
-
-;============================================================================
-GET_DISPMODE	LD	A,(DISPMODE)
-		CP  lo(IDISP_REG_DATA)
-		RET Z				;Z=1 : DISPMODE = REGISTER
-		CP  lo(IDISP_MEM_DATA)
-		SCF
-		RET NZ				;Z=0, C=1 : DISPMODE = I/O
-		OR	A			;WARNING, If LOW IDISP_MEM_DATA=0 Then ERROR
-		RET				;Z=0, C=0 : DISPMODE = MEM
-
-; bc	if 0x00 = lo(IDISP_MEM_DATA)
-; bc	   error "Error, LOW IDISP_MEM_DATA must not be 0x00"
-; bc	endif
-
-;============================================================================
-;	Increment Display Element
-;============================================================================
-ICMDA		CALL	GET_DISPMODE
-		JP  Z,	ICMA_REG
-		JP  C,	ICMA_IO
-
-		LD	HL,(ABUSS)
-		INC     HL
-		LD	(ABUSS),HL
-		JP	IKR_QREFRESH
-
-ICMA_REG	LD      A,(RegPtr)
-		INC	A
-		JP	ICMD_SET_REG
-
-ICMA_IO		LD	HL,IoPtr
-		INC	(HL)
-		JP	IKR_QREFRESH
-
-
-;============================================================================
-;	Decrement Display Element
-;============================================================================
-ICMDB		CALL	GET_DISPMODE
-		JP  Z,	ICMB_REG
-		JP  C,	ICMB_IO
-
-		LD	HL,(ABUSS)
-		DEC     HL
-		LD	(ABUSS),HL
-		JP	IKR_QREFRESH
-
-ICMB_IO		LD	HL,IoPtr
-		DEC	(HL)
-		JP	IKR_QREFRESH
-
-;============================================================================
-;	Alter Display Element
-;============================================================================
-ICMDD		CALL	GET_DISPMODE
-		JP  Z,	ICMD_REG
-		JP  C,	ICMD_IO
-
-ICMD_AMEM	CALL	WRITE_BLOCK
-		DW	LDISPMODE	;Where to write
-		DW	14		;Bytes to write
-		DW	IDISP_MEM	;(LDISPMODE)
-		DW	IDISP_MEM	;(DISPMODE)
-		DW	ICMD_BYTE	;(KEY_EVENT) Switch to BYTE Input Mode
-		DB	80		;(IK_TIMER)
-		DB	0x8F		;(KEYBFMODE) HEX Keyboard Mode (F on press)
-		DB	1		;(DISPLABEL)
-		DB	-1		;(IK_HEXST)
-		DW	LED_DISPLAY+5	;(HEX_CURSOR) @d6
-		DW	HEX2MEM		;(HEX_READY)
-
-		LD	HL,LED_ANBAR
-		SET	5,(HL)
-		SET	4,(HL)
-		JP	IKEY_DONE
-
-
-
-ICMD_REG	LD	HL,ICMD_WORD	;Switch to WORD Input Mode
-		LD	(KEY_EVENT),HL
-		LD	HL,HEX2REG
-		LD	(HEX_READY),HL
-		LD	HL,LED_DISPLAY+3 ;@d4
-		LD	(HEX_CURSOR),HL
-		;LD	A,0x8F
-		;LD	(KEYBFMODE),A	;HEX Keyboard
-		LD	HL,LED_ANBAR
-		SET	5,(HL)
-		SET	4,(HL)
-		JP	IKEY_DONE
-
-ICMD_IO		CP  lo(IDISP_IN_DATA)
-		JP  Z,	ICMD5
-
-ICMD_IO_OUT	CALL	WRITE_BLOCK
-		DW	LDISPMODE	;Where to write
-		DW	14		;Bytes to write
-		DW	IDISP_OUT	;(LDISPMODE)
-		DW	IDISP_OUT	;(DISPMODE)
-		DW	ICMD_BYTE	;(KEY_EVENT) Switch to HEX Input Mode
-		DB	80		;(IK_TIMER)
-		DB	0x8F		;(KEYBFMODE) HEX Keyboard Mode (F on press)
-		DB	0		;(DISPLABEL)
-		DB	-1		;(IK_HEXST)
-		DW	LED_DISPLAY+5	;(HEX_CURSOR) @d6
-		DW	HEX2OUT_PORT	;(HEX_READY)
-		LD	HL,LED_ANBAR
-		SET	3,(HL)
-		JP	IKEY_DONE
-
-;============================================================================
-;	LED Display Memory Location
-;============================================================================
-IDISP_MEM	LD	HL,LED_DISPLAY	;First, Display location
-		LD	A,(ABUSS+1)
-		CALL	LED_PUT_BYTE
-		LD	A,(ABUSS)
-		CALL	LED_PUT_BYTE
-		LD	A,0x80		;Blank next char
-		LD	(HL),A
-		LD	HL,IDISP_MEM_DATA
-		LD	(DISPMODE),HL
-					;Then Display DATA
-IDISP_MEM_DATA	LD	HL,(ABUSS)	;16
-		LD	A,(HL)		;7
-		LD	HL,LED_DISPLAY+5 ;10
-		CALL	LED_PUT_BYTE	;17+165
-		LD	HL,DISPLABEL	;10 Repeat Display of Data several times before redisplaying Location
-		DEC	(HL)		;7
-		JP NZ,	IDISP_RET	;10  st=242
-		LD	HL,IDISP_MEM
-		LD	(DISPMODE),HL
-		JP 	IDISP_RET
-
-;============================================================================
-;	LED Display Register
-;============================================================================
-IDISP_REG	LD	HL,(PUTCHAR_EXE) ;First, Display Register Name
-		PUSH	HL
-		CALL	LED_HOME
-		PUSH	BC
-		LD	A,(RegPtr)
-		LD	C,A
-		CALL	PUT_REGNAME
-		JR NC,	IDR_0
-		CALL	PUT_SPACE
-IDR_0		POP	BC
-		POP	HL
-		LD	(PUTCHAR_EXE),HL
-		LD	HL,IDISP_REG_DATA
-		LD	(DISPMODE),HL
-
-IDISP_REG_DATA	LD	A,(RegPtr)	;13 Then Display Data
-		CALL	GET_REGISTER	;17+169
-		LD	A,L		;4
-		PUSH	AF		;11
-		LD	A,H		;4
-		LD	HL,LED_DISPLAY+3 ;10
-		CALL	LED_PUT_BYTE	;17+165
-		POP	AF		;10
-		CALL	LED_PUT_BYTE	;17+165
-		LD	HL,DISPLABEL	;10
-		DEC	(HL)		;7
-		JP NZ,	IDISP_RET	;10   sp=629
-		LD	HL,IDISP_REG
-		LD	(DISPMODE),HL
-		JP 	IDISP_RET
-
-
-
-;============================================================================
-;	LED Display Input Port
-;============================================================================
-IDISP_IN	LD	HL,(PUTCHAR_EXE)
-		CALL	LED_HOME
-		CALL	PRINTI
-		DB	'in',EOS
-		LD	(PUTCHAR_EXE),HL
-		LD	A,(IoPtr)
-		LD	HL,LED_DISPLAY+2
-		CALL	LED_PUT_BYTE
-		LD	(HL),0x80	;Blank d5
-		LD	HL,IDISP_IN_DATA
-		LD	(DISPMODE),HL
-
-IDISP_IN_DATA	PUSH	BC
-		LD	A,(IoPtr)
-		LD	C,A
-		IN	A,(C)
-		POP	BC
-		LD	HL,LED_DISPLAY+5
-		CALL	LED_PUT_BYTE
-		LD	HL,DISPLABEL
-		DEC	(HL)
-		JP NZ,	IDISP_RET
-		LD	HL,IDISP_IN
-		LD	(DISPMODE),HL
-		JP 	IDISP_RET
-
-
-;============================================================================
-;	LED Display Output Port
-;============================================================================
-IDISP_OUT	LD	HL,(PUTCHAR_EXE)
-		CALL	LED_HOME
-		CALL	PRINTI
-		DB	'ou',EOS
-		LD	(PUTCHAR_EXE),HL
-		LD	A,(IoPtr)
-		LD	HL,LED_DISPLAY+2
-		CALL	LED_PUT_BYTE
-		LD	(HL),0x80	;Blank d5
-		LD	HL,IDISP_OUT_DATA
-		LD	(DISPMODE),HL
-
-IDISP_OUT_DATA	LD	HL,DISPLABEL
-		DEC	(HL)
-		JP NZ,	IDISP_RET
-		LD	HL,IDISP_OUT
-		LD	(DISPMODE),HL
-		JP 	IDISP_RET
-
-;============================================================================
-;	LED Display OFF
-;============================================================================
-IDISP_OFF	LD	HL,LED_DISPLAY
-		LD	A,0x80
-		PUSH	BC
-		LD	B,8
-IDO_LP		LD	(HL),A
-		INC	L
-		DJNZ	IDO_LP
-		POP	BC
-		LD	HL,IDISP_RET
-		LD	(DISPMODE),HL
-		JP 	(HL)
-
-;============================================================================
-;	LED Delay	- After a delay for spash screen, display Registers
-;============================================================================
-IDISP_DELAY	LD	HL,DISPLABEL
-		DEC	(HL)
-		JP NZ,	IDISP_RET
-		JP 	IKC_RESET_CMD
-
-;============================================================================
-;PUTS 2 HEX digits to LED Display
-;Input:	A=BYTE to display
-;	HL=Where to display
-;Output: HL=Next LED Display location
-LED_PUT_BYTE	PUSH	AF		;11 Save Byte to display (for 2nd HEX digit)
-		PUSH	HL		;11 Save where to display it
-		RRCA			;4
-		RRCA			;4
-		RRCA			;4
-		RRCA			;4
-		AND	0xF		;7
-		LD	H, hi(LED_HEX)	;7
-		LD	L,A		;4
-		LD	A,(HL)		;7  Fetch LED Font for HEX digit
-		POP	HL		;10
-		LD	(HL),A		;7  Display 1st HEX digit
-		POP	AF		;10
-		PUSH	HL		;11 Save where to display 2nd HEX digit
-		AND	0xF		;7
-		LD	H,hi(LED_HEX)	;7
-		LD	L,A		;4
-		LD	A,(HL)		;7
-		POP	HL		;10
-		INC	HL		;6
-		LD	(HL),A		;7
-		INC	HL		;6
-		RET			;10  st=165
-
-LED_PUT_HEX	AND	0xF
-		LD	H, hi(LED_HEX)
-		LD	L,A
-		LD	A,(HL)		;Fetch LED Font for HEX digit
-		LD	HL,(HEX_CURSOR)
-		LD	(HL),A		;Display 1st HEX digit
-		INC	HL
-		LD	(HEX_CURSOR),HL
-		RET
-
-
-
-;============================================================================
-;	Subroutine	Dly
-;
-;	Entry:	A = Millisecond count
-;============================================================================
-Dly:	PUSH	HL			; Save count
-	LD	HL,TicCnt
-	ADD	A,(HL)			; A = cycle count
-DlyLp	CP	(HL)			; Wait required TicCnt times
-	JP	NZ,DlyLp		;  loop if not done
-	POP	HL
-	RET
-
-#endif
 
 ;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 ;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
 ;	Appendix A	LED FONT
 ;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 ;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
-#if 0
-
-; **         *********  *******        *********    *****    **     **  *********
-; **         *********  ********       *********   *******   ***    **  *********
-; **         **         **    ***      **         ***   ***  ****   **     ***
-; **         **         **     **      **         **     **  *****  **     ***
-; **         *********  **     **      *********  **     **  ** *** **     ***
-; **         *********  **     **      *********  **     **  **  *****     ***
-; **         **         **     **      **         **     **  **   ****     ***
-; **         **         **    ***      **         ***   ***  **    ***     ***
-; *********  *********  ********       **          *******   **     **     ***
-; *********  *********  *******        **           *****    **     **     ***
-
-;	0 = Segment D OR LED7       --4--
-;	1 = Segment E OR LED6      2|   |3
-;	2 = Segment F OR LED5       |   |
-;	3 = Segment B OR LED4       --5--
-;	4 = Segment A OR LED3      1|   |6
-;	5 = Segment G OR LED2       |   |
-;	6 = Segment C OR LED1       --0--
-
-
-		ORG  ($ & 0xFF00) + 0x100
-LED_HEX	DB	%11011111, %11001000, %10111011, %11111001, %11101100, %11110101, %11110111, %11011000	;00-07 01234567
-	DB	%11111111, %11111100, %11111110, %11100111, %10010111, %11101011, %10110111, %10110110	;08-0F 89ABCDEF
-
-
-		ORG  ($ & 0xFF00) + 0x20
-;	**** 	; CGABFED,   CGABFED,   CGABFED,   CGABFED,   CGABFED,   CGABFED,   CGABFED,   CGABFED	;HEX	Character
-LED_FONT DB	%10000000, %10000110, %10001100, %10111100, %11010101, %10101000, %10101001, %10000100 	;20-27  !"#$%&'
-	DB	%10010111, %11011001, %10010100, %10100110, %11000001, %10100000, %10000001, %10101010	;28-2F ()*+,-./
-	DB	%11011111, %11001000, %10111011, %11111001, %11101100, %11110101, %11110111, %11011000	;30-37 01234567
-	DB	%11111111, %11111100, %10010001, %11010001, %10000011, %10100001, %11000001, %10111010	;38-3F 89:;<=>?
-	DB	%11111011, %11111110, %11100111, %10010111, %11101011, %10110111, %10110110, %11010111	;40-47 @ABCDEFG
-	DB	%11101110, %11001000, %11001011, %10101110, %10000111, %11101010, %11011110, %11011111	;48-4F HIJKLMNO
-	DB	%10111110, %11111100, %10100010, %11110101, %10010110, %11001111, %11001111, %11001111	;50-57 PQRSTUVW
-	DB	%11100000, %11101101, %10011011, %10010111, %11100100, %11011001, %10011100, %10000001	;58-5F XYZ[\]^_
-	DB	%10001000, %11111011, %11100111, %10100011, %11101011, %10111111, %10110110, %11111101	;60-67 `abcdefg
-	DB	%11100110, %11000000, %11001011, %10101110, %10000110, %11101010, %11100010, %11100011	;68-6F hijklmno
-	DB	%10111110, %11111100, %10100010, %11110101, %10100111, %11000011, %11000011, %11000011	;70-77 pqrstuvw
-	DB	%11100000, %11101101, %10011011, %10010111, %10000110, %11011001, %10110001, %11101011	;78-7F xyz{|}~
-
-
-#endif
 
 
 
@@ -4222,6 +2239,7 @@ RXBUFFER	equ	0xFE00	;256 bytes of RX Buffer space
 StackTop	equ	0xFF60	; Stack = 0xFF80 (Next Stack Push Location = 0xFF7F)
 
 ;*** BEGIN COLD_BOOT_INIT (RAM that is to be initialized upon COLD BOOT) ***
+#if 0
 RAMSIGNATURE	equ	0xFF60	;RAM signature
 				;WARNING, Following 19 bytes must be consecutive in this order
 RC_TYPE		equ	0xFF68	;Type of Reset (WARNING, Next 7 RC counters must end with lsb bits = 001,010,011,100,101,110,111)
@@ -4242,7 +2260,9 @@ RX_ERR_LDRT	equ	0xFF77	;Counts False Start Bits (Noise Flag)
 RX_ERR_STOP	equ	0xFF78	;Counts Missing Stop Bits (Framing Error)
 RX_ERR_OVR	equ	0xFF79	;Counts Overrun Errors
 BEEP_TO		equ	0xFF7A	;Count down the beep (beep duration)
+#endif
 
+hex_buffer	equ	0xFF70	;
 ;*** END COLD_BOOT_INIT (RAM that is to be initialized upon COLD BOOT) ***
 
 				;Saved Registers

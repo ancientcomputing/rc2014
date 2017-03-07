@@ -121,7 +121,7 @@ vecTabProto	JP	TXA			; RST 08
 ;------------------------------------------------------------------------------
 
 SIGNON1:       .BYTE     CS
-		.BYTE	"Z80",CR,LF,0
+		.BYTE	"RC2014",CR,LF,0
 ;               .BYTE     "Z80 SBC By Grant Searle",CR,LF,0
 SIGNON2:       .BYTE     CR,LF
 		.BYTE	"C/W?",0
@@ -166,8 +166,9 @@ notWrap:        LD       (serInPtr),HL
 rts0:           POP      HL
                 POP      AF
                 EI
-handle_nmi:
                 RETI
+handle_nmi:
+		RETN
 
 ;------------------------------------------------------------------------------
 ; RST 10H
