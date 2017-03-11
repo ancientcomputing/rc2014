@@ -13,3 +13,9 @@ This gives us more flexibility in swapping in alternative serial IRQ handlers, a
 Some minor changes were made so that the ZASM cross-assembler worked.
 <p>
 The primary RC2014 Github repo is at: https://github.com/RC2014Z80/RC2014
+<p>
+<b>Serial console Monitor program for the RC2014</b>
+<p>
+I have adapted the original monitor program for Lee Hart's Z80 Membership Card for the RC2014. Check out the source code in the "source" folder and a ready-to-burn ROM image mon.rom under the rom folder. All original authorship rights are acknowledged in the source code.
+<p>
+The RC2014 monitor is a mostly full-function monitor that allows you to view and modify RAM contents, read/write I/O ports, upload Intel HEX files and execute programs.
