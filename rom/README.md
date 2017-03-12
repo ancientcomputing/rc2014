@@ -1,5 +1,5 @@
 ROMs for the RC2014
 <p>
-rom.rom - BASIC ROM using modified bas32K.asm and int32K.asm
+rom.rom - BASIC ROM using a modified bas32K.asm and int32K.asm
 <p>
-mon.rom - Monitor ROM using modified int32K.asm and hacked version of Josh Bensadon's monitor for Lee Hart's Z80 Membership Card.
+mon.rom - Monitor/Debugger for the RC2014. This can replace the original BASIC ROM that comes with th RC2014.

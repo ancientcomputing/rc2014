@@ -26,15 +26,20 @@
 ;
 ;==================================================================================
 
+; System RAM utilization
+; 8000H-80FFH - BIOS
+; 8100H-81FFH - Monitor
+; 8200H onwards - BASIC
+
 vecTableStart	.EQU	$8000
-rst08vector	.EQU	vecTableStart
-rst10vector	.EQU	vecTableStart+3
-rst18vector	.EQU	vecTableStart+6
-rst20vector	.EQU	vecTableStart+9
-rst28vector	.EQU	vecTableStart+12
-rst30vector	.EQU	vecTableStart+15
-rst38vector	.EQU	vecTableStart+18
-nmivector	.EQU	vecTableStart+21
+rst08vector	.EQU	vecTableStart		; Actual vector is at +1
+rst10vector	.EQU	vecTableStart+3		; Actual vector is at +4
+rst18vector	.EQU	vecTableStart+6		; Actual vector is at +7
+rst20vector	.EQU	vecTableStart+9		; Actual vector is at +10
+rst28vector	.EQU	vecTableStart+12	; Actual vector is at +13
+rst30vector	.EQU	vecTableStart+15	; Actual vector is at +16
+rst38vector	.EQU	vecTableStart+18	; Actual vector is at +19
+nmivector	.EQU	vecTableStart+21	; Actual vector is at +22
 vecTableLength	.EQU	24	; 8x3
 vecTableEnd	.EQU	$8020
 
@@ -49,12 +54,12 @@ SER_EMPTYSIZE   .EQU     5
 RTS_HIGH        .EQU     0D6H
 RTS_LOW         .EQU     096H
 
-serBuf          .EQU     vecTableEnd	; $8000
+serBuf          .EQU     vecTableEnd	; 8020H (was $8000)
 serInPtr        .EQU     serBuf+SER_BUFSIZE
 serRdPtr        .EQU     serInPtr+2
 serBufUsed      .EQU     serRdPtr+2
 basicStarted    .EQU     serBufUsed+1
-TEMPSTACK       .EQU     serBuf+$ED	; $80ED ; Top of BASIC line input buffer so is "free ram" when BASIC resets
+TEMPSTACK       .EQU     80FFH	; serBuf+$ED	; $80ED ; Top of BASIC line input buffer so is "free ram" when BASIC resets
 
 CR              .EQU     0DH
 LF              .EQU     0AH
@@ -121,7 +126,7 @@ vecTabProto	JP	TXA			; RST 08
 ;------------------------------------------------------------------------------
 
 SIGNON1:       .BYTE     CS
-		.BYTE	CR,LF,"RC2014",0
+		.BYTE	CR,LF,"BIOS",0
 ;               .BYTE     "Z80 SBC By Grant Searle",CR,LF,0
 SIGNON2:       .BYTE     CR,LF
 		.BYTE	"C/W?",0
