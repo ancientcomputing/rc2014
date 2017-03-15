@@ -16,16 +16,16 @@ It now uses RST calls for console input/output via the BIOS code in int32K.asm.
 Disabled a bunch of other serial console commands as well. 
 <p>
 Monitor commands are:<br>
-?              Print this help
-C              Continue from Breakpoint
-D XXXX         Dump memory from XXXX
-E XXXX         Edit memory from XXXX
-G XXXX         Go execute from XXXX
-H XXXX         Set HEX file start address to XXXX
-I XX           Input from port XX
-O XX YY        Output YY to port XX
-R              Display registers from Breakpoint
-:sHLtD...C     Load Intel HEX file, ':' is part of file
+?              Print this help<br>
+C              Continue from Breakpoint<br>
+D XXXX         Dump memory from XXXX<br>
+E XXXX         Edit memory from XXXX<br>
+G XXXX         Go execute from XXXX<br>
+H XXXX         Set HEX file start address to XXXX<br>
+I XX           Input from port XX<br>
+O XX YY        Output YY to port XX<br>
+R              Display registers from Breakpoint<br>
+:sHLtD...C     Load Intel HEX file, ':' is part of file<br>
 <p>
 Some Intel HEX files do not correctly set the memory address: the first address is set to 0000H instead of the ORG value in the source code. If that is the case, use the W command to set the RAM address where you want to load your code from the HEX file. Then upload the file.
 <p>
