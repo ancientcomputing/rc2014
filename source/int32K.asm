@@ -76,20 +76,26 @@ RST00           DI                       ;Disable interrupts
 ; TX a character over RS232 
 
                 .ORG     0008H
-RST08            JP      rst08vector	; TXA
+RST08:
+		JP      rst08vector	; TXA
+;		JP	TXA
 
 ;------------------------------------------------------------------------------
 ; RX a character over RS232 Channel A [Console], hold here until char ready.
 
                 .ORG 0010H
-RST10            JP      rst10vector	; RXA
+RST10:
+		JP      rst10vector	; RXA
+;		JP	RXA
 
 ;------------------------------------------------------------------------------
 ; Check serial status
 ; Check if serial receive buffer is empty
 
                 .ORG 0018H
-RST18            JP      rst18vector	; CKINCHAR
+RST18:
+		JP      rst18vector	; CKINCHAR
+;		JP	CKINCHAR
 
 ;------------------------------------------------------------------------------
 ; RST20
@@ -110,7 +116,9 @@ RST30            JP      rst30vector	;
 ; RST 38 - INTERRUPT VECTOR [ for IM 1 ]
 
                 .ORG     0038H
-RST38            JP      rst38vector	; serialInt       
+RST38:
+            	JP      rst38vector	; serialInt
+;		JP	serialInt       
 
 ;------------------------------------------------------------------------------
 ; vector table prototype. to be copied to RAM on reset

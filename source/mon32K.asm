@@ -15,6 +15,8 @@
 ; 7. Disable/remove all xmodem stuff for now
 ; 8. Misc clean up and renames (PUT->PRINT etc)
 ; 9. Add more verbosity for user-friendliness
+; 10. Optimize register listing, and save/restore IR on breakpoint
+; 11. Why do we need V(ersion)? Include version info in ? and save some bytes!
 ;
 ;
 ; Notes for users of the Serial terminal emulator program on Mac OS X when uploading
@@ -83,7 +85,7 @@
 ; 8100H-81FFH - Monitor
 ; 8200H onwards - BASIC
 
-; RST xx vector table
+; RST xx vector table (from int32K.asm)
 vecTableStart	.EQU	$8000
 rst08vector	.EQU	vecTableStart		; Actual vector is at +1
 rst10vector	.EQU	vecTableStart+3		; Actual vector is at +4
@@ -96,7 +98,6 @@ nmivector	.EQU	vecTableStart+21	; Actual vector is at +22
 vecTableLength	.EQU	24	; 8x3
 vecTableEnd	.EQU	$8020
 
-
 MON_RAM		equ	8100H	; Start of Monitor RAM scratch space
 
 StackTop	equ	81FFH	; Stack = 0x81FF (Next Stack Push Location = 0x81FE)
@@ -105,19 +106,21 @@ hex_buffer	equ	MON_RAM		; Offset for Intel HEX uploads
 BRKPOINT	equ	MON_RAM+2	; Flag to indicate that we've hit a breakpoint and that the saved registers are valid
 
 ; Saved Registers for breakpoint
-RSSP		equ	MON_RAM+4	; Value of SP upon breakpoint
-RSAF		equ	MON_RAM+6	; Value of AF upon breakpoint
-RSBC		equ	MON_RAM+8	; Value of BC upon breakpoint
-RSDE		equ	MON_RAM+10	; Value of DE upon breakpoint
-RSHL		equ	MON_RAM+12	; Value of HL upon breakpoint
-RSPC		equ	MON_RAM+14	; Value of PC upon breakpoint
-RSIX		equ	MON_RAM+16	; Value of IX upon breakpoint
-RSIY		equ	MON_RAM+18	; Value of IY upon breakpoint
-RSIR		equ	MON_RAM+20	; Value of IR upon breakpoint
-RSAF2		equ	MON_RAM+22	; Value of AF' upon breakpoint
-RSBC2		equ	MON_RAM+24	; Value of BC' upon breakpoint
-RSDE2		equ	MON_RAM+26	; Value of DE' upon breakpoint
-RSHL2		equ	MON_RAM+28	; Value of HL' upon breakpoint
+; Stored in order that they will be printed out
+
+RSAF		equ	MON_RAM+4	; Value of AF upon breakpoint
+RSBC		equ	MON_RAM+6	; Value of BC upon breakpoint
+RSDE		equ	MON_RAM+8	; Value of DE upon breakpoint
+RSHL		equ	MON_RAM+10	; Value of HL upon breakpoint
+RSAF2		equ	MON_RAM+12	; Value of AF' upon breakpoint
+RSBC2		equ	MON_RAM+14	; Value of BC' upon breakpoint
+RSDE2		equ	MON_RAM+16	; Value of DE' upon breakpoint
+RSHL2		equ	MON_RAM+18	; Value of HL' upon breakpoint
+RSIX		equ	MON_RAM+20	; Value of IX upon breakpoint
+RSIY		equ	MON_RAM+22	; Value of IY upon breakpoint
+RSIR		equ	MON_RAM+24	; Value of IR upon breakpoint
+RSSP		equ	MON_RAM+26	; Value of SP upon breakpoint
+RSPC		equ	MON_RAM+28	; Value of PC upon breakpoint
 
 ECHO_ON		equ	MON_RAM+30	; Echo characters
 XMSEQ		equ	MON_RAM+32	; XMODEM SEQUENCE NUMBER
@@ -136,7 +139,7 @@ ESC		equ	27
 
 ; Use this to create a binary that can be uploaded to and run from RAM e.g. for testing
 ; For ZASM, use the following command: zasm -u -x mon32K.asm
-;		.ORG 9000H		; To test monitor in RAM
+;		.ORG 4000H		; To test monitor in RAM
 		
 ;------------------------------------------------------------------------------
 ; This part is from bas32K.asm
@@ -176,24 +179,20 @@ MM_CC:
 
 		; Handle Alpha commands here
 		AND 	0x5F		; Convert to upper case
-		CP 	'H'		; We'll print help only if explicitly asked
-		JR	Z, DO_HELP	; H is a possible user default for help
 		CP 	'D'		;Branch to Command entered
 		JP 	Z, MEM_DUMP	; D = Memory Dump
 		CP 	'E'
 		JP 	Z, MEM_EDIT	; E = Edit Memory
 		CP 	'G'
 		JP 	Z, GO_EXEC	; G = Go (Execute at)
-		CP 	'W'
-		JP 	Z, SET_BUFFER	; W = Set buffer start address for Intel HEX upload
+		CP 	'H'
+		JP 	Z, SET_BUFFER	; H = Set buffer start address for Intel HEX upload
 		CP 	'O'
 		JP Z, 	PORT_OUT	; O = Output to port
 		CP 	'I'
 		JP Z, 	PORT_INP	; I = Input from Port
 ;		CP 	'X'
 ;		JP Z, 	XMODEM		; X = XMODEM
-		CP 	'V'
-		JP	Z, VERSION		; V = Version
 		CP	'R'
 		JP	Z, DISPLAY_REG
 		CP	'C'
@@ -204,108 +203,78 @@ MM_CC:
 ; Print out help
 DO_HELP:
 		CALL 	PRINTI		;Display Help when input is invalid
-		DB	CR,LF,"HELP"
+VERSION:
+		DB	CR,LF,"Monitor/Debugger v0.5.0 for RC2014"
 		DB	CR,LF,"?              Print this help"
 		DB	CR,LF,"C              Continue from Breakpoint"
 		DB	CR,LF,"D XXXX         Dump memory from XXXX"
 		DB	CR,LF,"E XXXX         Edit memory from XXXX"
 		DB	CR,LF,"G XXXX         Go execute from XXXX"
+		DB	CR,LF,"H XXXX         Set HEX file start address to XXXX"
 		DB	CR,LF,"I XX           Input from port XX"
 		DB	CR,LF,"O XX YY        Output YY to port XX"
 		DB	CR,LF,"R              Display registers from Breakpoint"
-		DB	CR,LF,"V              Version"
-		DB	CR,LF,"W XXXX         Set HEX file start address to XXXX"
-		DB	CR,LF,":sHLtD...C     UPLOAD Intel HEX file, ':' is part of file"
-;		DB	CR,LF,"X U XXXX       XMODEM Upload to memory at XXXX"
-;		DB	CR,LF,"X D XXXX CCCC  XMODEM Download from XXXX for CCCC #of 128 byte blocks"
+		DB	CR,LF,":sHLtD...C     Load Intel HEX file, ':' is part of file"
 		DB	CR,LF,EOS
 		JP 	MAIN_MENU
-
-;------------------------------------------------------------------------------
-; Display Version
-
-VERSION		CALL	PRINTI
-		DB	CR,LF,"Monitor/Debugger v0.4 for RC2014",CR,LF,EOS
-		JP	MAIN_MENU
 		
 ;------------------------------------------------------------------------------
 ; MEMORY DUMP
 ; We will dump until ESC is pressed
-
 MEM_DUMP:
-		LD	B,0		;Paused Dump - FIXME
-MEM_DUMP_0:
 		; out:	c=1	A = non-hex char input	DE = Word
 		; out:	c=0	A = non-hex char input (No Word in DE)
 		CALL	SPACE_GET_WORD	;Input start address
 		JR	NC, MD_END	; If no carry, no word in DE
-		EX	DE, HL		;HL = Start
-		LD	DE, 0FFFFH	; Auto to end of RAM
-
+		LD	HL, DE
+MEM_DUMP_0:
+		LD	B,16		; 16 lines of 16 bytes = dump 256 bytes
 MEM_DUMP_LP:
 		CALL	PRINT_NEW_LINE
 		CALL	DUMP_LINE	;Dump 16 byte lines (advances HL)
-		RET 	Z			;RETURN WHEN HL=DE
-		LD	A,L
-		OR	B
-		JR  	NZ, MEM_DUMP_LP	;Dump 1 Page, then prompt for continue
+		DJNZ	MEM_DUMP_LP	; Loop if not done with 16 lines
+
 		CALL	PRINTI
 		DB	CR,LF,"Press any key to continue, ESC to abort",EOS
 		CALL	GET_CHAR
 		CP	27
-		JR	NZ, MEM_DUMP_LP
+		JR	NZ, MEM_DUMP_0	; Dump next 256 bytes	;LP
+		; Otherwise, end
 MD_END:
 		JP	MAIN_MENU
 
 ;-----------------------------------------------------------------------------
 ; DUMP_LINE -- Dumps a line
-; xxx0  <pre spaces> XX XX XX XX XX After spaces | ....ASCII....
-; Needs work/optimization
+; xxxx  XX XX XX XX XX | ....ASCII....
+; We save BC 'cos we'll be using B
+; HL points to the memory address we are starting at
+; Exit: HL points to next byte
 
-DUMP_LINE:	PUSH	BC		;+1
+DUMP_LINE:
+		PUSH	BC		;+1 Save BC because we're using b
 		PUSH	HL		;+2 Save H for 2nd part of display
 		PUSH	HL		;+3 Start line with xxx0 address
-		CALL	PRINT_HL		;Print Address
+		CALL	PRINT_HL	;Print Address, HL is not changed
 		CALL	PRINT_SPACE
 		POP	HL		;-3
-		LD	A,L
-		AND	0x0F		;Fetch how many prespaces to print
-		LD	C,A
-		LD	B,A		;Save count of prespaces for part 2 of display
-		CALL	PUT_3C_SPACES
-
-DL_P1L:
-		LD	A,(HL)
+		LD	B, 16		; Dump 16 bytes per line
+		
+DL_P1L:		; Start of print byte loop
+		LD	A,(HL)		; Read byte
 		CALL	SPACE_PRINT_BYTE
-		CALL	CP_HL_DE
-		JR	Z, DL_P1E
-		INC	HL
-		LD	A,L
-		AND	0x0F
-		JR 	NZ, DL_P1L
-		JR	DL_P2
-
-DL_P1E:
-		LD	A,L
-		CPL
-		AND	0x0F
-		LD	C,A
-		CALL	PUT_3C_SPACES
-
-DL_P2:
+		INC	HL		; Next
+		DJNZ	DL_P1L		; Loop next byte
+;DL_P2:
 		CALL	PRINTI		;Print Seperator between part 1 and part 2
 		DB	" ; ",EOS
 
-DL_PSL2:		LD	A,B		;Print prespaces for part 2
-		OR	A
-		JR	Z, DL_PSE2
-		CALL	PRINT_SPACE
-		DEC	B
-		JR	DL_PSL2
-DL_PSE2:
-		POP	HL		;-2
-		POP	BC		;-1
-DL_P2L:
+		; Print characters
+DL_PSL2:
+		POP	HL		;-2	Retrieve HL
+		LD	B, 16		; 16 bytes per line
+		
+		; Print ASCII characters
+DL_P2L:		; Start of print ASCII loop
 		LD	A,(HL)
 		CP	' '		;A - 20h	Test for Valid ASCII characters
 		JR	NC, DL_P2K1
@@ -316,32 +285,10 @@ DL_P2K1:
 		LD	A,'.'
 DL_P2K2:
 		CALL	PUT_CHARBC
-		CALL	CP_HL_DE
-		RET	Z
 		INC	HL
-		LD	A,L
-		AND	0x0F
-		JR  	NZ,	DL_P2L
-
-;-----------------------------------------------------------------------------
-; Compare HL with DE
-; Exit:	Z=1 if HL=DE
-;	M=1 if DE > HL
-CP_HL_DE:
-		LD	A,H
-		CP	D		;H-D
-		RET	NZ			;M flag set if D > H
-		LD	A,L
-		CP	E		;L-E
-		RET
-PUT_3C_SPACES:
-		INC	C		;Print 3C Spaces
-PUT_3C_SPACES_L:
-		DEC	C		;Count down Prespaces
-		RET Z
-		CALL	PRINTI		;Print pre spaces
-		DB "   ",EOS
-		JR	PUT_3C_SPACES_L
+		DJNZ	DL_P2L		; Loop
+		POP	BC		; Restore B
+		RET			; HL points to next char
 
 ;-----------------------------------------------------------------------------
 ; EDIT MEMORY
@@ -364,8 +311,8 @@ ME_LP:
 		JR	NC, ME_LP0	; Valid byte
 		JP	MAIN_MENU	; C=1 -> exit
 ME_LP0:
-		LD	(HL), A		;or Save new value
-		LD	A, (HL)
+		LD	(HL), A		; Save new value
+		LD	A, (HL)		; Read back value
 		CALL	SPACE_PRINT_BYTE
 		INC	HL		;Advance to next location
 		JR	ME_LP		;repeat input
@@ -415,22 +362,6 @@ PORT_OUT:
 ; So Monitor operations will clobber data on your stack when this happens
 ; Usage recommendation: Use your own stack space
 
-#if 0
-RSSP		equ	MON_RAM+4	;Value of SP upon breakpoint
-RSAF		equ	MON_RAM+6	;0xFF82	;Value of AF upon breakpoint
-RSBC		equ	MON_RAM+8	;0xFF84	;Value of BC upon breakpoint
-RSDE		equ	MON_RAM+10	;0xFF86	;Value of DE upon breakpoint
-RSHL		equ	MON_RAM+12	;0xFF88	;Value of HL upon breakpoint
-RSPC		equ	MON_RAM+14	;0xFF8A	;Value of PC upon breakpoint
-RSIX		equ	MON_RAM+16	;0xFF8C	;Value of IX upon breakpoint
-RSIY		equ	MON_RAM+18	;0xFF8E	;Value of IY upon breakpoint
-RSIR		equ	MON_RAM+20	;0xFF90	;Value of IR upon breakpoint
-RSAF2		equ	MON_RAM+22	;0xFF92	;Value of AF' upon breakpoint
-RSBC2		equ	MON_RAM+24	;0xFF94	;Value of BC' upon breakpoint
-RSDE2		equ	MON_RAM+26	;0xFF96	;Value of DE' upon breakpoint
-RSHL2		equ	MON_RAM+28	;0xFF98	;Value of HL' upon breakpoint
-#endif
-
 HANDLE_BRKPOINT:
 		; We get here after a RST30
 		; PC is at SP 
@@ -449,6 +380,11 @@ HANDLE_BRKPOINT:
 		LD	(RSDE), DE
 		LD	(RSIX), IX
 		LD	(RSIY), IY
+		LD	A, I			; Save IR
+		LD	H, A
+		LD	A, R
+		LD	L, A
+		LD	(RSIR), HL
 		EX	AF, AF'
 		EXX
 		LD	(RSHL2), HL
@@ -462,10 +398,11 @@ HANDLE_BRKPOINT:
 		LD	HL, 0A5A5H
 		LD	(BRKPOINT), HL		; Indicate we have valid breakpoint info
 		EI
-		CALL	PRINTI
-		DB	LF,CR,"Breakpoint at ",EOS
-		LD	HL, (RSPC)
-		CALL	PRINT_HL
+;;		CALL	PRINTI
+;;		DB	LF,CR,"Breakpoint at ",EOS
+;		CALL	BRKPOINT_MSG
+;;		LD	HL, (RSPC)
+;;		CALL	PRINT_HL
 		CALL	REG_DISP_ALL		; Display the registers
 		CALL	PRINTI
 		DB	LF,CR,"Press C to continue or ESC to return to Monitor",EOS
@@ -485,6 +422,11 @@ RELOAD_REG:
 		LD	DE, (RSDE)
 		LD	IX, (RSIX)
 		LD	IY, (RSIY)
+		LD	HL, (RSIR)		; Restore IR
+		LD	A, L
+		LD	R, A
+		LD	A, H
+		LD	I, A
 		LD	HL, (RSAF)		; Restore AF
 		PUSH	HL
 		POP	AF
@@ -504,6 +446,16 @@ RELOAD_REG:
 		LD	HL, (RSHL)		; Restore HL
 		EI
 		RET				; Jump to PC
+
+;------------------------------------------------------------------------------
+
+BRKPOINT_MSG:
+		CALL	PRINTI
+		DB	LF,CR,"Breakpoint at PC=",EOS
+		LD	HL, (RSPC)
+		DEC	HL	; Point to the RST 30H instruction
+		CALL	PRINT_HL
+		RET
 
 ;------------------------------------------------------------------------------
 ; Continue from a previous breakpoint
@@ -530,28 +482,41 @@ DISPLAY_REG:
 		CALL	REG_DISP_ALL		; Display registers
 		JP	MAIN_MENU
 
-;12345678901234567890123456789012345678901234567890123456789012345678901234567890  80 COLUMNS
-;AF=xxxx  BC=xxxx  DE=xxxx  HL=xxxx  AF'=xxxx  BC'=xxxx  DE'=xxxx  HL'=xxxx
-;IX=xxxx  IY=xxxx  IR=xxxx  PC=xxxx  SP=xxxx
+; -----------------------------------------------------------------------------
+; Display register values
+; Breakpoint at PC=xxxx
+; AF =xxxx  BC =xxxx  DE =xxxx  HL =xxxx  
+; AF'=xxxx  BC'=xxxx  DE'=xxxx  HL'=xxxx
+; IX =xxxx  IY =xxxx  IR =xxxx  SP =xxxx
 
 REG_DISP_ALL:
+		CALL	BRKPOINT_MSG
 		CALL	PRINT_NEW_LINE	;Dump ALL registers
-		LD	B,13		;13 Registers to dump
-RM_LP		LD	HL,REGORDER
-		LD	A,B
-		DEC	A
-		CALL	ADD_HL_A
-		LD	C,(HL)
+		LD	B, 0		;12 Registers to dump
+RM_LP:
+		LD	C, B
 		CALL	PRINT_REGNAME
 		CALL	RM_DUMP_REG
 		CALL	PRINTI
 		DB	'  ',EOS
-		LD	A,6
+		LD	A,3
 		CP	B
-		JR  	NZ,	RM_1
+		JR  	NZ, RM_0
+RM_1:
 		CALL	PRINT_NEW_LINE
-RM_1		DJNZ	RM_LP
+		JR	RM_2
+RM_0:
+		LD	A,7
+		CP	B
+		JR	Z, RM_1
+RM_2:
+		INC	B
+		LD	A, 12
+		CP	B
+		JR	NZ, RM_LP
 		RET
+
+;------------------------------------------------------------------------------
 
 RM_DUMP_REG:
 		LD	A,'='
@@ -561,69 +526,50 @@ RM_DUMP_REG:
 		CALL	PRINT_HL
 		RET
 
-REGORDER	DB	0
-		DB	5
-		DB	8
-		DB	7
-		DB	6
-		DB	12
-		DB	11
-		DB	10
-		DB	9
-		DB	4
-		DB	3
-		DB	2
-		DB	1
-
 ; -------------------------------------------------------------------
 ; Input: C = number of the register
-; Carry = 1 if not alternative
-; Carry = 0 if alternative register
 
-PRINT_REGNAME	CALL	GET_REGNAME
+PRINT_REGNAME:
+		CALL	GET_REGNAME
 		CALL	PRINT
-		LD	A,C		;Test for alternate register
-		CP	9
-		RET	C		;Exit C set if NOT an alternate register (LED OUTPUT, PRINT SPACE)
-		LD	A,0x27		;Apostrophe Char
-		CALL	PUT_CHARBC
-		SCF
 		RET
 
 ; -----------------------------------------------------------------------------
-; Input: C = Number of the register
-; Output: HL = pointer to name of the register
+; Get the name of the register
+; Input: C = Number of the register (0-12)
+; Exit: HL = pointer to name of the register
 
 GET_REGNAME:
-		LD	A,C		; Multiple by 3
+		LD	A,C		; Multiple by 4
+		ADD	A,C
 		ADD	A,C
 		ADD	A,C
 		LD	HL,REGNAMES
 		CALL	ADD_HL_A
 		RET
 
-		; C holds the value 0-12
-REGNAMES	DB	'SP',0		;0
-		DB	'AF',0		;1
-		DB	'BC',0		;2
-		DB	'DE',0		;3
-		DB	'HL',0		;4
-		DB	'PC',0		;5
-		DB	'IX',0		;6
-		DB	'IY',0		;7
-		DB	'IR',0		;8
-		DB	'AF',0		;9
-		DB	'BC',0		;10
-		DB	'DE',0		;11
-		DB	'HL',0		;12
+REGNAMES	
+		DB	'AF ',0
+		DB	'BC ',0
+		DB	'DE ',0
+		DB	'HL ',0
+		DB	'AF',27H,0
+		DB	'BC',27H,0
+		DB	'DE',27H,0
+		DB	'HL',27H,0
+		DB	'IX ',0
+		DB	'IY ',0
+		DB	'IR ',0
+		DB	'SP ',0
 
 ; -----------------------------------------------------------------------------
-; Input: C = number 0-12 of the register
 ; Calculate offset to RAM where we store the value of the register
+; Input: C = number 0-12 of the register
+; Exit: HL = offset
 
 GET_REGISTER:
 		PUSH	DE
-		LD	HL, RSSP	; Start of register storage area
+		LD	HL, RSAF	; Start of register storage area
 		LD	A, C
 		ADD	A, C		; Multiple by 2
 		CALL	ADD_HL_A
@@ -793,6 +739,7 @@ ASCHEX:
 #endif
 ; -----------------------------------------------------------------------------
 ; PRINT_HL Prints HL Word as Hex
+; Exit: HL is not changed
 
 PRINT_HL:		
 		LD	A, H
@@ -816,7 +763,7 @@ SPACE_PRINT_BYTE:
 ; PRINT_BYTE -- Output byte to console as hex
 ;
 ; Input: A register contains byte to be output
-; Output: Destroys A
+; Exit: Destroys A
 
 PRINT_BYTE:
 		PUSH	AF
@@ -867,25 +814,6 @@ PRINT_NEW_LINE:	LD	A, 0x0D
 		JP	PUT_CHARBC
 
 ;------------------------------------------------------------------------------
-;Terminal Increment byte at (HL).  Do not pass 0xFF
-#if 0
-TINC:		INC	(HL)
-		RET	NZ
-		DEC	(HL)
-		RET
-#endif
-;------------------------------------------------------------------------------
-#if 0
-DELAY_10mS	LD	C, 24	; bc 12
-DELAY_C		PUSH	BC
-		LD	B,0
-DELAY_LP	DJNZ	DELAY_LP	;13 * 256 / 4 = 832uSec
-		DEC	C
-		JR	NZ, DELAY_LP	;*4 ~= 7mSec
-		POP	BC
-		RET
-#endif
-;------------------------------------------------------------------------------
 ADD_HL_A	ADD	A,L		;4
 		LD	L,A		;4
 		RET NC			;10
@@ -899,14 +827,7 @@ LD_HL_HL	LD      A,(HL)		;7
 		LD      L,A		;4
 		RET			;10
 
-;------------------------------------------------------------------------------
-#if 0
-IS_LETTER	CP	'A'
-		RET C
-		CP	'Z'+1
-		CCF
-		RET
-#endif
+
 ;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 ;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
 ;	Chapter 6	Menu operations. ASCII HEXFILE TRANSFER
@@ -1086,507 +1007,6 @@ GET_CHAR_LP:
 		RET	M
 		JP	PUT_CHARBC
 
-;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
-;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
-;	Chapter 7	Menu operations. XMODEM FILE TRANSFER
-;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
-;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
-#if 0
-;----------------------------------------------------------------------------------------------------
-; XMODEM ROUTINES
-
-SOH	equ	1	;Start of Header
-EOT	equ	4	;End of Transmission
-ACK	equ	6
-DLE	equ	16
-DC1	equ	17	; (X-ON)
-DC3	equ	19	; (X-OFF)
-NAK	equ	21
-SYN	equ	22
-CAN	equ	24	;(Cancel)
-
-;---------------------------------------------------------------------------------
-;XMODEM MENU
-;ENTRY:	TOP OF LDCK HOLDS RETURN ADDRESS (EXIT MECHANDSM IF XMODEM IS CANCELLED)
-;---------------------------------------------------------------------------------
-XMODEM		CALL	PUT_SPACE
-		CALL	GET_CHAR	;get char
-		AND	0x5F		;to upper case
-		CP	'D'
-		JR 	NZ, X_NOTD 
-		CALL	XMDN		; D = DOWNLOAD
-		JR	XM_EXIT
-X_NOTD:
-		CP	'U'
-		JR 	NZ, X_NOTU 
-		CALL	XMUP		; U = UPLOAD
-		JR	XM_EXIT
-X_NOTU:
-		CALL 	PRINTI
-		DB	"?",EOS
-XM_EXIT:
-		JP	MAIN_MENU
-
-;---------------------------------------------------------------------------------
-;XMDN - XMODEM DOWNLOAD (send file from IMSAI to Terminal)
-;INPUT STARTING ADDRESS AND COUNT OF BLOCKS (WORD)
-;WAIT FOR 'C' OR NAK FROM HOST TO START CRC/CS TRANSFER
-;---------------------------------------------------------------------------------
-XMDN		CALL	SPACE_GET_WORD	;Input Address
-		EX	DE,HL		;HL = Address to SAVE DATA
-		CALL	SPACE_GET_WORD	;Input #Blocks to Send
-					;DE = Count of Blocks
-
-		LD	A,D
-		OR	E
-		RET Z			;Exit if Block Count = 0
-
-	;HL = Address of data to send from the IMSAI 8080
-	;DE = Count of Blocks to send.
-
-		CALL	XMS_INIT	;Starts the Seq, Sets the CS/CRC format
-					;Cancelled Transfers will cause a RET
-
-XMDN_LP		CALL	XMS_SEND	;Sends the packet @HL, Resends if NAK
-					;Cancelled Transfers will cause a RET
-		DEC	DE
-		LD	A,D
-		OR	E
-		JR  NZ,	XMDN_LP
-
-		CALL	XMS_EOT		;Send End of Transmission
-		JP	PURGE
-
-
-;---------------------------------------------------------------------------------
-;XMUP - XMODEM UPLOAD (receive file from Terminal to IMSAI 8080)
-;INPUT STARTING ADDRESS
-;SEND 'C' OR NAK TO HOST TO START CRC/CS TRANSFER
-;---------------------------------------------------------------------------------
-XMUP		CALL	SPACE_GET_WORD	;Input Address
-		EX	DE,HL		;HL = Address to SAVE DATA
-
-	;HL = Address of data to send from the IMSAI 8080
-
-		CALL	XMR_INIT	;Starts the transfer & Receives first PACKET
-					;Cancelled Transfers will cause a RET
-
-XMUP_LP		CALL	XMR_RECV	;Receives the next packet @HL, Resends if NAK
-					;Cancelled Transfers will cause a RET
-		JR C,	XMUP_LP		;Jump until EOT Received
-		JP	PURGE
-
-
-
-;---------------------------------------------------------------------------------
-;INIT FOR SENDING XMODEM PROTOCOL, GET NAK OR 'C', SAVE THE XMTYPE
-;---------------------------------------------------------------------------------
-XMS_INIT	LD	A,1		;First SEQ number
-		LD	(XMSEQ),A
-
-		LD	B,6		;6 retries for initiating the transfer
-XMS_INIT_LP	LD	A,28		;GET CHAR, 15 SECONDS TIMEOUT (EXPECT C OR NAK)
-		CALL	TIMED_GETCHAR
-		JP C,	XMS_INIT_RT	;Cancel if Host Timed out
-
-		CP	NAK		;If NAK, Start Checksum Download
-		JR Z,	XMS_DO
-		CP	'C'		;If C, Start CRC Download
-		JR Z,	XMS_DO
-XMS_INIT_RT	DJNZ	XMS_INIT_LP	;Count down Retries
-		JP	XM_CANCEL	;Cancel XModem if all retries exhausted
-
-XMS_DO		LD	(XMTYPE),A
-		RET
-
-;---------------------------------------------------------------------------------
-;SEND A PACKET (RESEND UPON NAK)
-;---------------------------------------------------------------------------------
-XMS_RESEND	LD	BC,0xFF80
-		ADD	HL,BC
-XMS_SEND	PUSH	DE
-		LD	A,SOH		;SEND THE HEADER FOR CRC OR CHECKSUM
-		CALL	PUT_CHARBC
-		LD	A,(XMSEQ)
-		CALL	PUT_CHARBC
-		CPL
-		CALL	PUT_CHARBC
-		LD	DE,0x0000	;Init DE=0000 (CRC Accumulator)
-		LD	C,0		;Init C=00 (CS Accumulator)
-		LD	B,128		;Count 128 bytes per block
-XMS_BLP		LD	A,(HL)		;Fetch bytes to send  -------------------\
-		CALL	PUT_CHARBC	;Send them
-		CALL	CRC_UPDATE	;Update the CRC
-		LD	A,(HL)
-		ADD	A,C		;Update the CS
-		LD	C,A
-		INC	HL		;Advance to next byte in block
-		DEC	B		;Count down bytes sent
-		JR NZ,	XMS_BLP		;Loop back until 128 bytes are sent -----^
-		LD	A,(XMTYPE)
-		CP	NAK		;If NAK, send Checksum
-		JR Z,	XMS_CS		;----------------------v
-		LD	A,D		;else, Send the CRC next
-		CALL	PUT_CHARBC
-		LD	C,E
-XMS_CS		LD	A,C		;----------------------/
-		CALL	PUT_CHARBC
-					;Packet Sent, get Ack/Nak Response
-		LD	A,120		;GET CHAR, 60 SECONDS TIMEOUT (EXPECT C OR NAK)
-		CALL	TIMED_GETCHAR
-		POP	DE
-		JR C,	XM_CANCEL	;Cancel download if no response within 45 seconds
-		CP	NAK
-		JR Z,	XMS_RESEND	;Loop back to resend packet
-		CP	CAN
-		JR Z,	XM_CANCEL
-		CP	ACK
-		JR NZ,	XM_CANCEL
-
-		LD	A,(XMSEQ)
-		INC	A		;NEXT SEQ
-		LD	(XMSEQ),A
-		RET
-
-
-;---------------------------------------------------------------------------------
-;XMDN - DOWNLOAD XMODEM PACKET
-;---------------------------------------------------------------------------------
-XMS_EOT		LD	A,EOT		;HANDLE THE END OF TRANSFER FOR CRC OR CHECKSUM
-		CALL	PUT_CHARBC
-		LD	A,120		;GET CHAR, 60 SECONDS TIMEOUT (EXPECT C OR NAK)
-		CALL	TIMED_GETCHAR
-		JR C,	XM_CANCEL
-		CP	NAK
-		JR Z,	XMS_EOT
-		CP	ACK
-		JR NZ,	XM_CANCEL
-
-XM_DONE		CALL	PURGE
-		CALL	PRINTI
-		DB	CR,LF,"TRANSFER COMPLETE\r\n",EOS
-		XOR	A		;CLEAR A, CY
-		RET
-
-;FINISHING CODE PRIOR TO LEAVING XMODEM
-XM_CANCEL	LD	A,CAN
-		CALL	PUT_CHARBC
-		CALL	PUT_CHARBC
-		CALL	PURGE
-		CALL	PRINTI
-		DB	"TRANSFER CANCELED\r\n",EOS
-		POP	BC		;SCRAP CALLING ROUTINE AND HEAD TO PARENT
-		RET
-
-;---------------------------------------------------------------------------------
-;START XMODEM RECEIVING and RECEIVE FIRST PACKET
-;---------------------------------------------------------------------------------
-XMR_INIT	LD	E,7		;7 ATTEMPTS TO INITIATE XMODEM CRC TRANSFER
-		LD	A,1		;EXPECTED SEQ NUMBER starts at 1
-		LD	(XMSEQ),A
-XMR_CRC		CALL	PURGE
-		LD	A,'C'		;Send C
-		LD	(XMTYPE),A	;Save as XM Type (CRC or CS)
-		CALL	PUT_CHARBC
-		CALL	XMGET_HDR	;Await a packet
-		JR NC,	XMR_TSEQ	;Jump if first packet received
-		JR NZ,	XM_CANCEL	;Cancel if there was a response that was not a header
-		DEC	E		;Otherwise, if no response, retry a few times
-		JR NZ,	XMR_CRC
-
-		LD	E,9		;9 ATTEMPTS TO INITIATE XMODEM CHECKSUM TRANSFER
-XMR_CS		CALL	PURGE
-		LD	A,NAK		;Send NAK
-		LD	(XMTYPE),A	;Save as XM Type (CRC or CS)
-		CALL	PUT_CHARBC
-		CALL	XMGET_HDR	;Await a packet
-		JR NC,	XMR_TSEQ	;Jump if first packet received
-		JR NZ,	XM_CANCEL	;Cancel if there was a response that was not a header
-		DEC	E		;Otherwise, if no response, retry a few times
-		JR NZ,	XMR_CS
-		JR	XM_CANCEL	;Abort
-
-
-;--------------------- XMODEM RECEIVE
-;Entry:	XMR_TSEQ in the middle of the routine
-;Pre:	C=1 (expected first block as received when negogiating CRC or Checksum)
-;	HL=Memory to dump the file to
-;Uses:	B to count the 128 bytes per block
-;	C to track Block Number expected
-;	DE as CRC (Within Loop) (D is destroyed when Getting Header)
-;------------------------------------
-XMR_RECV	LD	A,ACK		;Send Ack to start Receiving next packet
-		CALL	PUT_CHARBC
-XMR_LP		CALL	XMGET_HDR
-		JR NC,	XMR_TSEQ
-		PUSH	HL
-		JR Z,	XMR_NAK		;NACK IF TIMED OUT
-		POP	HL
-		CP	EOT
-		JR NZ,	XM_CANCEL	;CANCEL IF CAN RECEIVED (OR JUST NOT EOT)
-		LD	A,ACK
-		CALL	PUT_CHARBC
-		JP	XM_DONE
-
-XMR_TSEQ	LD	C,A
-		LD	A,(XMSEQ)
-		CP	C		;CHECK IF THIS SEQ IS EXPECTED
-		JR Z,	XMR_SEQ_OK	;Jump if CORRECT SEQ
-		DEC	A		;Else test if Previous SEQ
-		LD	(XMSEQ),A
-		CP	C
-		JP NZ,	XM_CANCEL	;CANCEL IF SEQUENCE ISN'T PREVIOUS BLOCK
-		CALL	PURGE		;ELSE, PURGE AND SEND ACK (ASSUMING PREVIOUS ACK WAS NOT RECEIVED)
-		JR	XMR_ACK
-
-XMR_SEQ_OK	LD	B,128		;128 BYTES PER BLOCK
-		LD	C,0		;Clear Checksum
-		LD	DE,0x0000	;CLEAR CRC
-		PUSH	HL		;Save HL where block is to go
-XMR_BLK_LP	CALL	TIMED1_GETCHAR
-		JR C,	XMR_NAK
-		LD	(HL),A		;SAVE DATA BYTE
-		CALL	CRC_UPDATE
-		LD	A,(HL)		;Update checksum
-		ADD	A,C
-		LD	C,A
-		INC	HL		;ADVANCE
-		DEC	B
-		JR NZ,	XMR_BLK_LP
-					;After 128 byte packet, verify error checking byte(s)
-		LD	A,(XMTYPE)	;Determine if we are using CRC or Checksum
-		CP	NAK		;If NAK, then use Checksum
-		JR Z,	XMR_CCS
-		CALL	TIMED1_GETCHAR
-		JR C,	XMR_NAK
-		CP	D
-		JR NZ,	XMR_NAK
-		CALL	TIMED1_GETCHAR
-		JR C,	XMR_NAK
-		CP	E
-		JR NZ,	XMR_NAK
-		JR	XMR_ACK
-
-XMR_CCS		CALL	TIMED1_GETCHAR
-		JP C,	XMR_NAK
-		CP	C
-		JR NZ,	XMR_NAK
-
-		;If we were transfering to a FILE, this is where we would write the
-		;sector and reset HL to the same 128 byte sector buffer.
-		;CALL	WRITE_SECTOR
-
-XMR_ACK		;LD	A,ACK		;The sending of the Ack is done by
-		;CALL	PUT_CHARBC	;the calling routine, to allow writes to disk
-		LD	A,(XMSEQ)
-		INC	A		;Advance to next SEQ BLOCK
-		LD	(XMSEQ),A
-		POP	BC
-		SCF			;Carry set when NOT last packet
-		RET
-
-XMR_NAK		POP	HL		;Return HL to start of block
-		CALL	PURGE
-		LD	A,NAK
-		CALL	PUT_CHARBC
-		JR	XMR_LP
-
-
-;--------------------- XMODEM - GET HEADER
-;
-;pre:	Nothing
-;post:	Carry Set: A=0, (Zero set) if Timeout
-;	Carry Set: A=CAN (Not Zero) if Cancel received
-;	Carry Set: A=EOT (Not Zero) if End of Tranmission received
-;	Carry Clear and A = B = Seq if Header found and is good
-;------------------------------------------
-XMGET_HDR	LD	A,6		;GET CHAR, 3 SECONDS TIMEOUT (EXPECT SOH)
-		CALL	TIMED_GETCHAR
-		RET C			;Return if Timed out
-		CP	SOH		;TEST IF START OF HEADER
-		JR Z,	GS_SEQ		;IF SOH RECEIVED, GET SEQ NEXT
-		CP	EOT		;TEST IF END OF TRANSMISSION
-		JR Z,	GS_ESC		;IF EOT RECEIVED, TERMINATE XMODEM
-		CP	CAN		;TEST IF CANCEL
-		JR NZ,	XMGET_HDR
-GS_ESC		OR	A		;Clear Z flag (because A<>0)
-		SCF
-		RET
-GS_SEQ		CALL	TIMED1_GETCHAR	;GET SEQ CHAR
-		RET C			;Return if Timed out
-		LD	B,A		;SAVE SEQ
-		CALL	TIMED1_GETCHAR	;GET SEQ COMPLEMENT
-		RET C			;Return if Timed out
-		CPL
-		CP	B		;TEST IF SEQ VALID
-		JR NZ,	XMGET_HDR	;LOOP BACK AND TRY AGAIN IF HEADER INCORRECT (SYNC FRAME)
-		RET
-
-;------------------------------------------ CRC_UPDATE
-;HANDLE THE CRC CALCULATION FOR UP/DOWNLOADING
-;Total Time=775 cycles = 388uSec
-;In:	A  = New char to roll into CRC accumulator
-;	DE = 16bit CRC accumulator
-;Out:	DE = 16bit CRC accumulator
-;------------------------------------------
-;CRC_UPDATE	XOR	D		;4
-;		LD	D,A		;5
-;		PUSH	BC		;11
-;		LD	B,8		;7	PRELOOP=27
-;CRCU_LP	OR	A		;4	CLEAR CARRY
-;		LD	A,E		;5
-;		RLA			;4
-;		LD	E,A		;5
-;		LD	A,D		;5
-;		RLA			;4
-;		LD	D,A		;5
-;		JP NC,	CRCU_NX		;10
-;		LD	A,D		;5
-;		XOR	0x10		;7
-;		LD	D,A		;5
-;		LD	A,E		;5
-;		XOR	0x21		;7
-;		LD	E,A		;5
-;CRCU_NX	DEC	B		;5
-;		JP NZ,	CRCU_LP		;10	LOOP=91*8 (WORSE CASE)
-;		POP	BC		;10	POSTLOOP=20
-;		RET			;10
-
-
-;------------------------------------------ CRC_UPDATE
-;HANDLE THE CRC CALCULATION FOR UP/DOWNLOADING
-;Total Time=604 cycles = 302uSec MAX
-;In:	A  = New char to roll into CRC accumulator
-;	DE = 16bit CRC accumulator
-;Out:	DE = 16bit CRC accumulator
-;------------------------------------------
-CRC_UPDATE	EX	DE,HL			;4
-		XOR	H		;4
-		LD	H,A		;5
-		ADD	HL,HL		;10	Shift HL Left 1
-		CALL C,	CRC_UPC		;17 (10/61)
-		ADD	HL,HL		;10	Shift HL Left 2
-		CALL C,	CRC_UPC		;17
-		ADD	HL,HL		;10	Shift HL Left 3
-		CALL C,	CRC_UPC		;17
-		ADD	HL,HL		;10	Shift HL Left 4
-		CALL C,	CRC_UPC		;17
-		ADD	HL,HL		;10	Shift HL Left 5
-		CALL C,	CRC_UPC		;17
-		ADD	HL,HL		;10	Shift HL Left 6
-		CALL C,	CRC_UPC		;17
-		ADD	HL,HL		;10	Shift HL Left 7
-		CALL C,	CRC_UPC		;17
-		ADD	HL,HL		;10	Shift HL Left 8
-		CALL C,	CRC_UPC		;17
-		EX	DE,HL			;4
-		RET			;10
-
-CRC_UPC		LD	A,H		;5
-		XOR	0x10		;7
-		LD	H,A		;5
-		LD	A,L		;5
-		XOR	0x21		;7
-		LD	L,A		;5
-		RET			;10
-
-
-;XModem implementation on 8080 Monitor (CP/M-80)
-;
-;Terminal uploads to 8080 system:
-;-Terminal user enters command "XU aaaa"
-;-8080 "drives" the protocol since it's the receiver
-;-8080 sends <Nak> every 10 seconds until the transmitter sends a packet
-;-if transmitter does not begin within 10 trys (100 seconds), 8080 aborts XMODEM
-;-a packet is:
-; <SOH> [seq] [NOT seq] [128 bytes of data] [checksum or CRC]
-;
-;<SOH> = 1 (Start of Header)
-;<EOT> = 4 (End of Transmission)
-;<ACK> = 6
-;<DLE> = 16
-;<DC1> = 17 (X-ON)
-;<DC3> = 19 (X-OFF)
-;<NAK> = 21
-;<SYN> = 22
-;<CAN> = 24 (Cancel)
-;
-;Checksum is the ModuLOW 256 sum of all 128 data bytes
-;
-;                                     <<<<<          [NAK]
-;       [SOH][001][255][...][csum]    >>>>>
-;                                     <<<<<          [ACK]
-;       [SOH][002][254][...][csum]    >>>>>
-;                                     <<<<<          [ACK]
-;       [SOH][003][253][...][csum]    >>>>>
-;                                     <<<<<          [ACK]
-;       [EOT]                         >>>>>
-;                                     <<<<<          [ACK]
-;
-;-if we get <EOT> then ACK and terminate XModem
-;-if we get <CAN> then terminate XModem
-;-if checksum invalid, then NAK
-;-if seq number not correct as per [NOT seq], then NAK
-;-if seq number = previous number, then ACK (But ignore block)
-;-if seq number not the expected number, then <CAN><CAN> and terminate XModem
-;-if data not received after 10 seconds, then NAK (inc Timeout Retry)
-;-if timeout retry>10 then <CAN><CAN> and terminate XModem
-;
-;-To keep synchronized,
-;  -Look for <SOH>, qualify <SOH> by checking the [seq] / [NOT seq]
-;  -if no <SOH> found after 135 chars, then NAK
-;
-;-False EOT condtion
-;  -NAK the first EOT
-;  -if the next char is EOT again, then ACK and leave XModem
-;
-;-False <CAN>, expect a 2nd <CAN> ?
-;
-;-Using CRC, send "C" instead of <NAK> for the first packet
-;  -Send "C" every 3 seconds for 3 tries, then degrade to checksums by sending <NAK>
-;
-;
-;
-;* The character-receive subroutine should be called with a
-;parameter specifying the number of seconds to wait.  The
-;receiver should first call it with a time of 10, then <nak> and
-;try again, 10 times.
-;  After receiving the <soh>, the receiver should call the
-;character receive subroutine with a 1-second timeout, for the
-;remainder of the message and the <cksum>.  Since they are sent
-;as a continuous stream, timing out of this implies a serious
-;like glitch that caused, say, 127 characters to be seen instead
-;of 128.
-;
-;* When the receiver wishes to <nak>, it should call a "PURGE"
-;subroutine, to wait for the line to clear.  Recall the sender
-;tosses any characters in its UART buffer immediately upon
-;completing sending a block, to ensure no glitches were mis-
-;interpreted.
-;  The most common technique is for "PURGE" to call the
-;character receive subroutine, specifying a 1-second timeout,
-;and looping back to PURGE until a timeout occurs.  The <nak> is
-;then sent, ensuring the other end will see it.
-;
-;* You may wish to add code recommended by Jonh Mahr to your
-;character receive routine - to set an error flag if the UART
-;shows framing error, or overrun.  This will help catch a few
-;more glitches - the most common of which is a hit in the high
-;bits of the byte in two consecutive bytes.  The <cksum> comes
-;out OK since counting in 1-byte produces the same result of
-;adding 80H + 80H as with adding 00H + 00H.
-
-
-
-
-
-
-;===============================================
-;TIMED1_GETCHAR - Gets a character within 1 second
-;-----------------------------------------------
-TIMED1_GETCHAR	LD	A, 2
-#endif
-
 ; -----------------------------------------------------------------------------
 ; GETCHAR_ESC - Gets a character with ESC detection
 ; In:	Nothing
@@ -1602,41 +1022,3 @@ GETCHAR_ESC:
 TGC_TOBC:
 		SCF			; C=1
 		RET
-
-#if 0
-TIMED_GETCHAR:	
-		PUSH	DE
-		PUSH	BC
-		LD	D,A
-TGC_LP1		LD	C,142		; D,C=Loop Count down until timeout
-TGC_LP2		
-		RST	18H		; Check if a char is available
-		CP	A, 00H
-		JR	NZ, TGC_AVAILABLE	; NZ = available		
-		DJNZ	TGC_LP2	;13/8	;110 Cycles inner Loop time. 70*256*.25 ~= 7 mSec
-		DEC	C	;5
-		JP 	NZ, TGC_LP2	;10
-		DEC	D
-		JP	NZ, TGC_LP1
-		SCF		; BC uncommented this...SET CARRY TO INDICATE TIME OUT
-TGC_RET		POP	BC
-		POP	DE
-		RET
-TGC_AVAILABLE:
-		RST	10H	; Go get the character
-		CCF		; Clear C, I hope...!
-		JP	TGC_RET
-
-;		RET
-
-; -----------------------------------------------------------------------------
-;PURGE - Clears all in coming bytes until the line is clear for a full 2 seconds
-;-----------------------------------------------
-
-PURGE
-		LD	A,4	;2 seconds for time out
-		CALL	TIMED_GETCHAR
-		JR	NC, PURGE
-		RET
-#endif
-
