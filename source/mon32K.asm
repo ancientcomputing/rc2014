@@ -17,6 +17,7 @@
 ; 9. Add more verbosity for user-friendliness
 ; 10. Optimize register listing, and save/restore IR on breakpoint
 ; 11. Why do we need V(ersion)? Include version info in ? and save some bytes!
+; 12. Use a couple of routines in int32K so that we save some bytes!
 ;
 ;
 ; Notes for users of the Serial terminal emulator program on Mac OS X when uploading
@@ -84,6 +85,10 @@
 ; 8000H-80FFH - BIOS
 ; 8100H-81FFH - Monitor
 ; 8200H onwards - BASIC
+
+; Routines available in int32K.asm
+BIOS_PRINT	.EQU	0069H
+BIOS_PRINT_CRLF	.EQU	006CH
 
 ; RST xx vector table (from int32K.asm)
 vecTableStart	.EQU	$8000
@@ -191,8 +196,6 @@ MM_CC:
 		JP Z, 	PORT_OUT	; O = Output to port
 		CP 	'I'
 		JP Z, 	PORT_INP	; I = Input from Port
-;		CP 	'X'
-;		JP Z, 	XMODEM		; X = XMODEM
 		CP	'R'
 		JP	Z, DISPLAY_REG
 		CP	'C'
@@ -204,7 +207,7 @@ MM_CC:
 DO_HELP:
 		CALL 	PRINTI		;Display Help when input is invalid
 VERSION:
-		DB	CR,LF,"Monitor/Debugger v0.5.0 for RC2014"
+		DB	CR,LF,"Monitor/Debugger v0.5.1 for RC2014"
 		DB	CR,LF,"?              Print this help"
 		DB	CR,LF,"C              Continue from Breakpoint"
 		DB	CR,LF,"D XXXX         Dump memory from XXXX"
@@ -398,14 +401,9 @@ HANDLE_BRKPOINT:
 		LD	HL, 0A5A5H
 		LD	(BRKPOINT), HL		; Indicate we have valid breakpoint info
 		EI
-;;		CALL	PRINTI
-;;		DB	LF,CR,"Breakpoint at ",EOS
-;		CALL	BRKPOINT_MSG
-;;		LD	HL, (RSPC)
-;;		CALL	PRINT_HL
 		CALL	REG_DISP_ALL		; Display the registers
 		CALL	PRINTI
-		DB	LF,CR,"Press C to continue or ESC to return to Monitor",EOS
+		DB	LF,CR,"Press C to continue or ESC to return to Monitor",CR,LF,EOS
 HB_INVKEY:
 		CALL	IN_CHARBC	; This is a blocking call, key in A
 		CP	27		; ESC?
@@ -683,10 +681,7 @@ GET_HEX_CHAR:
 		JP M,	GHC_NOT_RET	; Not HEX
 		CP	'F'+1
 		JP M,	GHC_ARET
-;		CP	'a'
-;		JP M,	GHC_NOT_RET
-;		CP	'f'+1
-;		JP M,	GHC_ARET
+
 GHC_NOT_RET	SCF
 		RET
 GHC_ARET	SUB	0x07
@@ -707,13 +702,10 @@ PUT_CHARBC:
 
 ; -----------------------------------------------------------------------------
 ; PRINT -- Print A null-terminated string @(HL)
+; Original code: HL points to byte past the EOS
+; BIOS code: HL points to EOS. But that is okay because EOS = NOP!!
 
-PRINT:		LD	A, (HL)
-		INC	HL
-		OR	A
-		RET	Z
-		CALL	PUT_CHARBC
-		JR	PRINT
+PRINT:		JP	BIOS_PRINT
 
 ; -----------------------------------------------------------------------------
 ; PRINT IMMEDIATE
@@ -723,20 +715,6 @@ PRINTI:		EX	(SP),HL	;HL = Top of Stack
 		EX	(SP),HL	;Move updated return address back to stack
 		RET
 
-; -----------------------------------------------------------------------------
-; ASCHEX -- Convert ASCII coded hex to nibble
-;
-; Input: A register contains ASCII coded nibble
-; Output: A register contains nibble
-#if 0
-ASCHEX:
-		SUB	0x30
-		CP	0x0A
-		RET M
-		AND	0x5F
-		SUB	0x07
-		RET
-#endif
 ; -----------------------------------------------------------------------------
 ; PRINT_HL Prints HL Word as Hex
 ; Exit: HL is not changed
@@ -808,25 +786,16 @@ PRINT_SPACE:	LD	A, ' '
 ;pre: none
 ;post: 0x0A printed to console
 
-PRINT_NEW_LINE:	LD	A, 0x0D
-		CALL	PUT_CHARBC
-		LD	A, 0x0A
-		JP	PUT_CHARBC
+PRINT_NEW_LINE:
+		JP	BIOS_PRINT_CRLF	;006CH		; Call BIOS
 
 ;------------------------------------------------------------------------------
+
 ADD_HL_A	ADD	A,L		;4
 		LD	L,A		;4
 		RET NC			;10
 		INC	H
 		RET
-
-;------------------------------------------------------------------------------
-LD_HL_HL	LD      A,(HL)		;7
-		INC     HL		;6
-		LD      H,(HL)		;7
-		LD      L,A		;4
-		RET			;10
-
 
 ;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 ;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
@@ -851,16 +820,20 @@ SE_0:
 		JP	MAIN_MENU
 
 ;------------------------------------------------------------------------------
-; ASCII HEXFILE TRANSFER
-;Registers:	B= Byte counter per line (initialized at start of line)
+; ASCII HEXFILE TRANSFER (INTEL Hex file format)
+; Registers:	B= Byte counter per line (initialized at start of line)
 ;		C= Check sum (initialized at start of line)
 ;		D= Temp for assembling HEX bytes
 ;		E= Error counter over the entire transfer
 ;		HL= Address to save data
+;		IX= byte count for the entire transfer
 ; We are jumping in here with the first character ":" already loaded
+; Changes here include making the process more deterministic since we're not
+; timing out.
 GETHEXFILE:
 		LD	E,0		;ZERO ERROR COUNTER
-		JR	GHDOLINE	; Jump straight to reading in the byte cound
+		LD	IX, 0		; Byte counter
+		JR	GHDOLINE	; Jump straight to reading in the byte count
 
 GHWAIT:
 		CALL	GETCHAR_ESC
@@ -896,6 +869,7 @@ GHLOOP:
 		JR	C, GHENDTO
 		LD	(HL),A
 		INC	HL
+		INC	IX
 		DJNZ	GHLOOP		;Repeat for all data in line
 
 		CALL	TGET_BYTE	;GET CHECKSUM
@@ -920,17 +894,24 @@ GHEND1:
 		DB	CR,LF,"HEX TRANSFER COMPLETE ERRORS=",EOS
 		LD	A,E
 		CALL	PRINT_BYTE
+	
+		CALL	PRINT_SPACE
+		PUSH	IX		; Byte count
+		POP	HL
+		CALL	PRINT_HL	; Print byte count
+		CALL	PRINTI
+		DB	" BYTES TRANSFERRED",EOS
 		JP	MAIN_MENU
 		
 ;-----------------------------------------------------------------------------
-;TGET_BYTE -- Get byte from console as hex with timeout
+; TGET_BYTE -- Get byte from console as hex
 ;
-;in:	Nothing
-;out:	A = Byte (if CY=0)  (last 2 hex characters)  Exit if Space Entered
+; Input: C holds a checksum byte
+; Exit:	A = Byte (if CY=0)  (last 2 hex characters)  Exit if Space Entered
 ;	A = non-hex char input (if CY=1)
 
 TGET_BYTE:	CALL	TGET_HEX_CHAR	;Get 1st HEX CHAR
-		JR  	C,  TGB0	; GHENDTO	;Exit previous routine with a time out (leaves address on stack but MAIN_MENU will reset stack)
+		JR  	C,  TGB0
 		RLCA			;Shift 1st HEX CHAR
 		RLCA
 		RLCA
@@ -938,7 +919,7 @@ TGET_BYTE:	CALL	TGET_HEX_CHAR	;Get 1st HEX CHAR
 		AND	0xF0
 		LD	D,A
 		CALL	TGET_HEX_CHAR	;Get 2nd HEX CHAR
-		JR  	C, TGB0	; GHENDTO
+		JR  	C, TGB0
 		OR	D
 		LD	D,A		;Save byte
 		ADD	A,C		;Add byte to Checksum
@@ -950,8 +931,8 @@ TGB0:
 	
 ;------------------------------------------------------------------------------
 ; Get HEX CHAR
-; In:	Nothing
-; Out:	CY=0, A = Value of HEX Char
+; Input: Nothing
+; Exit:	CY=0, A = Value of HEX Char
 ;	CY=1, A = Received (non-hex) char
 
 TGET_HEX_CHAR:
@@ -967,10 +948,6 @@ TGET_HEX_CHAR:
 		JP	M, TGHC_NOT_RET
 		CP	'F'+1
 		JP	M, TGHC_ARET		; A-F
-;		CP	'a'
-;		JP	M, TGHC_NOT_RET
-;		CP	'f'+1
-;		JP	M, TGHC_ARET
 TGHC_NOT_RET:
 		SCF
 		RET
@@ -1022,3 +999,4 @@ GETCHAR_ESC:
 TGC_TOBC:
 		SCF			; C=1
 		RET
+

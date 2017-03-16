@@ -145,6 +145,12 @@ SIGNON2:       .BYTE     CR,LF
                 JP	nmivector
 				
 ;------------------------------------------------------------------------------
+		; 0069H
+		JP	PRINT
+		; 006CH
+		JP	PRINT_NEW_LINE
+
+;------------------------------------------------------------------------------
 serialInt:      PUSH     AF
                 PUSH     HL
 
@@ -231,6 +237,8 @@ CKINCHAR        LD       A,(serBufUsed)
                 RET
 
 ;------------------------------------------------------------------------------
+; Input: HL points to the string
+; Exit; A is changed, HL points to EOS
 PRINT:          LD       A,(HL)          ; Get character
                 OR       A               ; Is it $00 ?
                 RET      Z               ; Then RETurn on terminator
@@ -238,6 +246,16 @@ PRINT:          LD       A,(HL)          ; Get character
                 INC      HL              ; Next Character
                 JR       PRINT           ; Continue until $00
                 RET
+        
+;------------------------------------------------------------------------------
+; Exit: A is changed
+PRINT_NEW_LINE:
+                LD        A,$0D
+		RST       08H
+		LD        A,$0A
+		RST       08H
+		RET
+                       
 ;------------------------------------------------------------------------------
 INIT:
                ; Set up vector table first
@@ -269,11 +287,12 @@ CORW:
                AND       %11011111       ; lower to uppercase
                CP        'C'
                JR        NZ, CHECKWARM
-               RST       08H
-               LD        A,$0D
-               RST       08H
-               LD        A,$0A
-               RST       08H
+;               RST       08H
+;               LD        A,$0D
+;               RST       08H
+;               LD        A,$0A
+;               RST       08H
+	       CALL	PRINT_NEW_LINE
 COLDSTART:     LD        A,'Y'           ; Set the BASIC STARTED flag
                LD        (basicStarted),A
                JP        $0150           ; Start BASIC COLD
@@ -281,12 +300,14 @@ CHECKWARM:
                CP        'W'
                JR        NZ, CORW
                RST       08H
-               LD        A,$0D
-               RST       08H
-               LD        A,$0A
-               RST       08H
+        
+;               LD        A,$0D
+;               RST       08H
+;               LD        A,$0A
+;               RST       08H
+	       CALL	PRINT_NEW_LINE
                JP        $0153           ; Start BASIC WARM
               
 		.ORG 0150H
               
-.END
+;.END
