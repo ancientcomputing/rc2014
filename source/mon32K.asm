@@ -1,4 +1,4 @@
-; Monitor/Debugger for Spencer Owen's RC2014 (rc2014.co.uk)
+; Monitor/Debugger for Spencer Owen's Z80-based RC2014 (http://rc2014.co.uk)
 ; Source hosted at: https://github.com/ancientcomputing/rc2014
 ;
 ; Changes:
@@ -18,7 +18,10 @@
 ; 10. Optimize register listing, and save/restore IR on breakpoint
 ; 11. Why do we need V(ersion)? Include version info in ? and save some bytes!
 ; 12. Use a couple of routines in int32K so that we save some bytes!
+; 13. Add John Kerr's disassembler. Extracted from UTILITY3 for the Spectrum. Visit John's
+; website at: http://mycodehere.blogspot.co.uk/2012/04/my-work-in-print-1987.html
 ;
+; -----------------------------------------------------------------------------
 ;
 ; Notes for users of the Serial terminal emulator program on Mac OS X when uploading
 ; Intel HEX files:
@@ -29,7 +32,8 @@
 ; configuration. This is my preferred option as there's a "command+T" hotkey to quickly
 ; upload a test program.
 ;
-; Changes to Josh Bensadon's original code are copyright Ben Chong and freely licensed to the community
+; Changes to Josh Bensadon's original code are copyright Ben Chong and freely licensed to 
+; the community
 ;
 ; -----------------------------------------------------------------------------
 ;	Acknowledgments
@@ -90,6 +94,14 @@
 BIOS_PRINT	.EQU	0069H
 BIOS_PRINT_CRLF	.EQU	006CH
 
+; John Kerr's Disassembler
+; For use in RAM
+;DISZ80          .EQU    5000H
+
+; For use in ROM - Int and Mon MUST occupy less than 2304 bytes
+; Int+Mon is less than 0B00H so we put the disassembler at 0B00H
+DISZ80         .EQU    0B00H
+
 ; RST xx vector table (from int32K.asm)
 vecTableStart	.EQU	$8000
 rst08vector	.EQU	vecTableStart		; Actual vector is at +1
@@ -113,7 +125,7 @@ BRKPOINT	equ	MON_RAM+2	; Flag to indicate that we've hit a breakpoint and that t
 ; Saved Registers for breakpoint
 ; Stored in order that they will be printed out
 
-RSAF		equ	MON_RAM+4	; Value of AF upon breakpoint
+RSAF		equ	MON_RAM+4	; 8104H Value of AF upon breakpoint
 RSBC		equ	MON_RAM+6	; Value of BC upon breakpoint
 RSDE		equ	MON_RAM+8	; Value of DE upon breakpoint
 RSHL		equ	MON_RAM+10	; Value of HL upon breakpoint
@@ -128,8 +140,9 @@ RSSP		equ	MON_RAM+26	; Value of SP upon breakpoint
 RSPC		equ	MON_RAM+28	; Value of PC upon breakpoint
 
 ECHO_ON		equ	MON_RAM+30	; Echo characters
-XMSEQ		equ	MON_RAM+32	; XMODEM SEQUENCE NUMBER
-XMTYPE		equ	MON_RAM+34	; XMODEM BLOCK TYPE (CRC/CS)
+;XMSEQ		equ	MON_RAM+32	; XMODEM SEQUENCE NUMBER
+;XMTYPE		equ	MON_RAM+34	; XMODEM BLOCK TYPE (CRC/CS)
+DISZ80_PTR      equ     MON_RAM+36      ; Pointer to code for disassembler
 
 ;String equates
 CR		equ	0x0D
@@ -184,8 +197,10 @@ MM_CC:
 
 		; Handle Alpha commands here
 		AND 	0x5F		; Convert to upper case
-		CP 	'D'		;Branch to Command entered
+		CP 	'D'		; Branch to Command entered
 		JP 	Z, MEM_DUMP	; D = Memory Dump
+		CP 	'A'		; Branch to Command entered
+		JP 	Z, DISASSEMBLE	; A = Call DISZ80
 		CP 	'E'
 		JP 	Z, MEM_EDIT	; E = Edit Memory
 		CP 	'G'
@@ -207,8 +222,9 @@ MM_CC:
 DO_HELP:
 		CALL 	PRINTI		;Display Help when input is invalid
 VERSION:
-		DB	CR,LF,"Monitor/Debugger v0.5.1 for RC2014"
+		DB	CR,LF,"Monitor/Debugger v0.6.0 for RC2014"
 		DB	CR,LF,"?              Print this help"
+		DB      CR,LF,"A XXXX         Disassemble from XXXX"
 		DB	CR,LF,"C              Continue from Breakpoint"
 		DB	CR,LF,"D XXXX         Dump memory from XXXX"
 		DB	CR,LF,"E XXXX         Edit memory from XXXX"
@@ -239,7 +255,7 @@ MEM_DUMP_LP:
 
 		CALL	PRINTI
 		DB	CR,LF,"Press any key to continue, ESC to abort",EOS
-		CALL	GET_CHAR
+		CALL	GET_CHAR_NE
 		CP	27
 		JR	NZ, MEM_DUMP_0	; Dump next 256 bytes	;LP
 		; Otherwise, end
@@ -396,7 +412,7 @@ HANDLE_BRKPOINT:
 		LD	(RSAF2), HL
 		LD	(RSBC2), BC
 		LD	(RSDE2), DE
-		EX	AF, AF'
+		EX	AF, AF'                 ; Switch back registers
 		EXX
 		LD	HL, 0A5A5H
 		LD	(BRKPOINT), HL		; Indicate we have valid breakpoint info
@@ -436,13 +452,13 @@ RELOAD_REG:
 		PUSH	HL
 		POP	AF
 		LD	HL, (RSHL2)
-		EX	AF, AF'			; I don't know if we really need to do this
+		EX	AF, AF'                 ; Switch back registers
 		EXX		
 		LD	HL, (RSPC)		; Get PC
 		LD	SP, (RSSP)		; Restore SP
 		PUSH	HL			; PC to Stack
 		LD	HL, (RSHL)		; Restore HL
-		EI
+		EI                              ; TODO: can we restore the IFF?
 		RET				; Jump to PC
 
 ;------------------------------------------------------------------------------
@@ -709,10 +725,12 @@ PRINT:		JP	BIOS_PRINT
 
 ; -----------------------------------------------------------------------------
 ; PRINT IMMEDIATE
+; Top of stack (PC) points to string
 
-PRINTI:		EX	(SP),HL	;HL = Top of Stack
+PRINTI:		EX	(SP),HL	; HL = Top of Stack
 		CALL	PRINT
-		EX	(SP),HL	;Move updated return address back to stack
+		EX	(SP),HL	; Move updated return address back to stack
+		                ; Points to EOS of string which is a NOP
 		RET
 
 ; -----------------------------------------------------------------------------
@@ -797,12 +815,35 @@ ADD_HL_A	ADD	A,L		;4
 		INC	H
 		RET
 
-;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
-;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
-;	Chapter 6	Menu operations. ASCII HEXFILE TRANSFER
-;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
-;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
+;------------------------------------------------------------------------------
+; Get a starting address to disassemble from
+; Press C to disassemble each instruction and ESC to return to main menu
+;
+DISASSEMBLE:
+                CALL	SPACE_GET_WORD	;Input address, c=1 if we have a word, c=0 if no word
+		JR	NC, DISZ_0	; If c=0 then there is no word, abort
+					; If c=1 then we have a word to load
+		LD	(DISZ80_PTR), DE	; Store word
+		CALL	PRINTI
+		DB	LF,CR,"Disassemble from ",EOS
+		LD	HL, DE          ; Address to HL
+		CALL	PRINT_HL
+		CALL    PRINTI
+		DB      CR,LF,"Press any key to step, ESC to abort", EOS
+DISZ_LP:
+		CALL    PRINT_NEW_LINE
+		LD      DE, (DISZ80_PTR)        ; Restore pointer for disassembly
+		CALL    DISZ80                  ; Disassemble one line
+		                                ; and print output
+		LD      (DISZ80_PTR), DE        ; Save pointer
+		; Then handle keypress and loop
+		CALL	GET_CHAR_NE
+		CP	27
+		JR      NZ, DISZ_LP     ; Not ESC = loop
+DISZ_0:
+		JP	MAIN_MENU
 
+;------------------------------------------------------------------------------
 ; Set the address to the buffer where we want to upload the Intel HEX file
 ; This is to be used if the Intel HEX file uses 0000h as the start address
 ; You will want to set this address to somewhere in RAM...
@@ -844,15 +885,16 @@ GHWAIT:
 		JR  	NZ, GHWAIT
 
 		; Handle a line
-GHDOLINE	CALL	TGET_BYTE	;GET BYTE COUNT
-		LD	B,A		;BYTE COUNTER
-		LD	C,A		;CHECKSUM
+GHDOLINE:	
+                        CALL	TGET_BYTE	;GET BYTE COUNT
+		LD	B, A		;BYTE COUNTER
+		LD	C, A		;CHECKSUM
 
 		CALL	TGET_BYTE	;GET HIGH ADDRESS
-		LD	H,A
+		LD	H, A
 
 		CALL	TGET_BYTE	;GET LOW ADDRESS
-		LD	L,A
+		LD	L, A
 		; Add buffer start
 		PUSH	DE
 		LD	DE, (hex_buffer)
@@ -910,16 +952,16 @@ GHEND1:
 ; Exit:	A = Byte (if CY=0)  (last 2 hex characters)  Exit if Space Entered
 ;	A = non-hex char input (if CY=1)
 
-TGET_BYTE:	CALL	TGET_HEX_CHAR	;Get 1st HEX CHAR
-		JR  	C,  TGB0
-		RLCA			;Shift 1st HEX CHAR
+TGET_BYTE:	CALL	TGET_HEX_CHAR	; Get 1st HEX CHAR
+		JR  	C,  TGB0        ; Received ESC
+		RLCA			; Shift 1st HEX CHAR
 		RLCA
 		RLCA
 		RLCA
 		AND	0xF0
 		LD	D,A
 		CALL	TGET_HEX_CHAR	;Get 2nd HEX CHAR
-		JR  	C, TGB0
+		JR  	C, TGB0         ; Received ESC
 		OR	D
 		LD	D,A		;Save byte
 		ADD	A,C		;Add byte to Checksum
@@ -999,4 +1041,11 @@ GETCHAR_ESC:
 TGC_TOBC:
 		SCF			; C=1
 		RET
+
+; Set of end of mon32K.asm so that we end up with a 4KB Int+Mon+DISZ80 binary
+; Comment these 2 lines out if compiling for running in RAM
+; Also comment these out if the size of the Monitor runs big otherwise ZASM will
+; throw an error fit
+                .ORG    0AFFH
+                DB      0AAH
 

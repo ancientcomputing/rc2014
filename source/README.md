@@ -11,12 +11,15 @@ bas32K.asm - Original NASCOM BASIC. Modified by Grant Searle. Modified to leave 
 mon32K.asm - Monitor/Debugger for the RC2014.
 <p>Adapted from the monitor program for Lee Hart's Z80 Membership Card. Written by Josh Bensadon. 
 <p>
+disz80.asm - John Kerr's Z80 disassembler for inline disassembly. Originally published in the SUBSET column of Personal Computer World 1987. Used in the Spectrum UTILITY3 program.
+<p>
 Hacked in a big way to remove all LED/matrix keyboard code. 
 It now uses RST calls for console input/output via the BIOS code in int32K.asm. 
 Disabled a bunch of other serial console commands as well. 
 <p>
 Monitor commands are:<br>
 ?              Print this help<br>
+A XXXX         Disassemble from XXXX<br>
 C              Continue from Breakpoint<br>
 D XXXX         Dump memory from XXXX<br>
 E XXXX         Edit memory from XXXX<br>
