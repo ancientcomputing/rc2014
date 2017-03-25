@@ -5,8 +5,8 @@
 ; 1. Adapted for zasm v4.0 assembler
 ; 2. Adapted for use with a modified init32K.asm BIOS by Grant Searle 
 ; (searle.hostei.com/grant)
-; 3. Removed/commented out all non-RS232 code in the original source
-; 4. Added W command to set the start of the workspace where we want to load an Intel HEX 
+; 3. Removed/commented out all non-RS232 code in the original monitor source
+; 4. Added H command to set the start of the workspace where we want to load an Intel HEX 
 ; file. Some assemblers generate hex files that start at address 0000H instead of using 
 ; the .org value
 ; 5. Clean up return from command handlers. Use explicit jump to MAIN_MENU
@@ -20,6 +20,9 @@
 ; 12. Use a couple of routines in int32K so that we save some bytes!
 ; 13. Add John Kerr's disassembler. Extracted from UTILITY3 for the Spectrum. Visit John's
 ; website at: http://mycodehere.blogspot.co.uk/2012/04/my-work-in-print-1987.html
+; 14. A User Guide is now available at:
+;       https://github.com/ancientcomputing/rc2014/tree/master/docs
+; 15. We now save the interrupt enable state (IFF2) during breakpoint handling
 ;
 ; -----------------------------------------------------------------------------
 ;
@@ -143,6 +146,7 @@ ECHO_ON		equ	MON_RAM+30	; Echo characters
 ;XMSEQ		equ	MON_RAM+32	; XMODEM SEQUENCE NUMBER
 ;XMTYPE		equ	MON_RAM+34	; XMODEM BLOCK TYPE (CRC/CS)
 DISZ80_PTR      equ     MON_RAM+36      ; Pointer to code for disassembler
+IFF_STATE       equ     MON_RAM+38      ; State of IFF at breakpoint
 
 ;String equates
 CR		equ	0x0D
@@ -174,6 +178,7 @@ MON_COLD:
 		LD	HL, 0000H
 		LD	(hex_buffer), HL	; Clear workspace offset for Intel HEX file
 		LD	(BRKPOINT), HL		; Clear breakpoint flag
+		LD      (IFF_STATE), HL         ; Clear interrupt enable state
 		; Set vector table for breakpoint handling
 		LD	HL, HANDLE_BRKPOINT
 		LD	(rst30vector+1), HL
@@ -222,7 +227,7 @@ MM_CC:
 DO_HELP:
 		CALL 	PRINTI		;Display Help when input is invalid
 VERSION:
-		DB	CR,LF,"Monitor/Debugger v0.6.0 for RC2014"
+		DB	CR,LF,"Monitor/Debugger v0.6.1 for RC2014"
 		DB	CR,LF,"?              Print this help"
 		DB      CR,LF,"A XXXX         Disassemble from XXXX"
 		DB	CR,LF,"C              Continue from Breakpoint"
@@ -328,7 +333,7 @@ ME_LP:
 		; A = non-hex char input (if CY=1)
 		CALL	SPACE_GET_BYTE	; Input new value or Exit if invalid
 		JR	NC, ME_LP0	; Valid byte
-		JP	MAIN_MENU	; C=1 -> exit
+		JP	MAIN_MENU	; Invalid byte, C=1 -> exit
 ME_LP0:
 		LD	(HL), A		; Save new value
 		LD	A, (HL)		; Read back value
@@ -339,20 +344,23 @@ ME_LP0:
 ;------------------------------------------------------------------------------
 ; GO_EXEC - Execute program at XXXX
 ; Get an address and jump to it
+; It would be good to use a CALL then the user routine can just use a RET to
+; get back to the Monitor. However, this requires the user routine to maintain the
+; integrity of the Monitor stack and will also conflict with breakpoints.
 
 GO_EXEC:
 		CALL	SPACE_GET_WORD	;Input address, c=1 if we have a word, c=0 if no word
-		JR	C, ME_0		; If c=1 then we have a word to jump to
+		JR	C, GE_0		; If c=1 then we have a word to jump to
 		JP	MAIN_MENU	; If c=0 then there is no word, abort
-ME_0:
+GE_0:
 		CALL	PRINTI
 		DB	' PC=',EOS
 		LD	H,D
 		LD	L,E
 		CALL	PRINT_HL
-
+		
 		LD	HL, DE
-		JP	(HL)		; HL contains the target address
+		JP	(HL)		; HL contains the target address	
 
 ;------------------------------------------------------------------------------
 ; Input from port, print contents
@@ -366,11 +374,15 @@ PORT_INP:
 
 ;------------------------------------------------------------------------------
 ; Get a port address, write byte out
+; Give the user a way to abort and avoid writing to a port
+
 PORT_OUT:	
 		CALL	SPACE_GET_BYTE	; Port address
 		LD	C, A
 		CALL	SPACE_GET_BYTE	; Data to write to port
+		JR      C, PO_0         ; Abort if any other keypressed
 		OUT	(C),A
+PO_0:
 		JP	MAIN_MENU
 
 ; -------------------------------------------------------------------
@@ -385,7 +397,7 @@ HANDLE_BRKPOINT:
 		; We get here after a RST30
 		; PC is at SP 
 		; We now save all the registers
-		DI		; Optional?
+;		DI		; Optional?
 
 		LD	(RSHL), HL		; Save HL
 		POP	HL			; Grab PC & set SP to actual value
@@ -395,6 +407,16 @@ HANDLE_BRKPOINT:
 		PUSH	AF
 		POP	HL
 		LD	(RSAF), HL		; Save AF
+		; Some clunky code to capture state of the interrupt enable ff
+		LD      L, 0AAH                 ; Flag I enabled
+		LD      A, I                    ; Capture IFF state
+		                                ; Note P=1 is even, P=0 is odd
+		JP      PE, IENB                ; IFF set = enabled
+                LD      L, 055H                 ; Flag I disabled
+IENB:
+                LD      (IFF_STATE), HL         ; Save IFF_STATE
+		; Save the rest of the registers
+		DI                              ; Disable Interrupts for now
 		LD	(RSBC), BC
 		LD	(RSDE), DE
 		LD	(RSIX), IX
@@ -404,7 +426,7 @@ HANDLE_BRKPOINT:
 		LD	A, R
 		LD	L, A
 		LD	(RSIR), HL
-		EX	AF, AF'
+		EX	AF, AF'                 ; Switch to alternate registers
 		EXX
 		LD	(RSHL2), HL
 		PUSH	AF
@@ -429,6 +451,7 @@ HB_NESC:				; No
 		AND	05FH		; Check if C
 		CP	'C'
 		JR	NZ, HB_INVKEY	; No, go and get a valid key, no implicit defaults here
+		CALL    PRINT_NEW_LINE
 		; Reload registers and continue execution
 RELOAD_REG:
 		DI
@@ -441,10 +464,8 @@ RELOAD_REG:
 		LD	R, A
 		LD	A, H
 		LD	I, A
-		LD	HL, (RSAF)		; Restore AF
-		PUSH	HL
-		POP	AF
-		EX	AF, AF'
+
+		EX	AF, AF'                 ; Switch to alternate
 		EXX
 		LD	BC, (RSBC2)
 		LD	DE, (RSDE2)
@@ -452,13 +473,21 @@ RELOAD_REG:
 		PUSH	HL
 		POP	AF
 		LD	HL, (RSHL2)
-		EX	AF, AF'                 ; Switch back registers
-		EXX		
+		EX	AF, AF'                 ; Switch back to regular registers
+		EXX
+		; Check if we need to re-enable interrupts
+		LD      A, (IFF_STATE)          ; Check saved state
+		CP      A, 0AAH                 ; Interrupt enabled
+		JR      NZ, LEAVE_DI            ; Not 0AAh
+		EI                              ; TODO: can we restore the IFF?
+LEAVE_DI:       
+		LD	HL, (RSAF)		; Restore AF
+		PUSH	HL
+		POP	AF
 		LD	HL, (RSPC)		; Get PC
 		LD	SP, (RSSP)		; Restore SP
 		PUSH	HL			; PC to Stack
 		LD	HL, (RSHL)		; Restore HL
-		EI                              ; TODO: can we restore the IFF?
 		RET				; Jump to PC
 
 ;------------------------------------------------------------------------------
@@ -592,11 +621,12 @@ GET_REGISTER:
 		POP	DE
 		RET
 
-;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<;
-;	Chapter 5	Supporting routines. GET_BYTE, GET_WORD, PUT_BYTE, PUT_WORD
-;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
-
 ;------------------------------------------------------------------------------
+; Print a space, then get a byte from the serial console
+; in:	Nothing
+; out:	A = Byte (if CY=0)  (last 2 hex characters)  Exit if Space Entered
+;	A = non-hex char input (if CY=1)
+
 SPACE_GET_BYTE:
 		CALL	PRINT_SPACE
 
