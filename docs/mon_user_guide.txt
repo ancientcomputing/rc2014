@@ -122,8 +122,8 @@ With zasm, you would type in the following command:
         
 Where test.asm is the text file that contains this little program.
 
-zasm will a file called test.hex. If you open this file with a text editor, you will
-see the following contents:
+zasm will produce a file called test.hex. If you open this file with a text editor, you 
+will see the following contents:
 
         :170000002100003E0ACF3E0DCF015A5A3E41CF3CFE5B20FAC303C05F
         :00000001FF
@@ -132,8 +132,8 @@ The leading ':' symbols at the beginning of each line indicates that this is an 
 HEX file.
 
 The Monitor/Debugger is able to automatically understand that a ':' command means that 
-the nthe next set of data that is coming over the serial console is the rest of the 
-Intel HEX file.
+the next set of data that comes over the serial console is the rest of the Intel HEX 
+file.
 
 You can either copy the file from the test editor and then paste it onto the terminal
 emulator or use, if available, the built-in functions of your terminal emulator to send 
@@ -151,8 +151,8 @@ we're using and how it generates an Intel HEX file.
 
 This is because, when you write a Z80 program, you need to specify where in the memory
 space the program will reside and run. Unlike recent microprocessors, Z80 code is not
-location independent. Immediate jump instructions, for example, may use absolute 
-addresses.
+location independent without a lot of work. Immediate jump instructions, for example, 
+may use absolute addresses.
 
 In our little test program, we used the ".ORG 0C000H" command. This means that we have
 assembled the code to run from memory location 0C00H (in hexadecimal values).
@@ -172,7 +172,7 @@ What this does is to set the load address of the Intel HEX file data at memory l
 
 Sending an Intel HEX file to the RC2014
 
-Once you have set up the 'h' parameter, it is time to send the Intel HEX file to the 
+Once you have set up the 'H' parameter, it is time to send the Intel HEX file to the 
 RC2014.
 
 Again, you can copy contents of the file, then paste it onto the terminal emulator
@@ -190,7 +190,7 @@ was transferred.
 
 Execute Your Program!
 
-Now that you have successfully transferred the program, let's run it!
+Now that you have successfully transferred the program to the RC2014, let's run it!
 
 To run the program, type the following at the Monitor prompt:
         g c000<ENTER>
@@ -203,7 +203,7 @@ the RC2014.
 Once you hit reset, you will be prompted with:
         C/W?
 
-Hit 'w' for warm start.
+Hit 'W' for warm start.
 
 
 Exploring Memory Contents
@@ -260,7 +260,7 @@ You will see:
 Where 3E is the LD A instruction. Press 3E to enter the same value. You will see:
         C00C : 3E 3e 3E
 
-Where the second 3e is what you typed and the 3rd 3E is a confirmation that the value
+Where the second 3e is what you typed and the third 3E is a confirmation that the value
 was written to memory and successfully read back.
 
 You will then see the content on the next memory location:
@@ -268,7 +268,7 @@ You will then see the content on the next memory location:
 
 Now, 41 is the hexadecimal value for 'A'. To insert '0' instead, type 30 which is the
 hexadecimal value for '0'. Thus:
-        C00D : 41 31 31
+        C00D : 41 30 30
 
 Now run the program again with g c000. What do you see?
 
@@ -394,9 +394,11 @@ From the Monitor prompt, you can press R to look at the contents of the register
 Changing Register Contents
 
 The Monitor/Debugger does not have a command to allow you to change breakpoint registers
-directly. You will just need to modify the memory locations where the registers are 
-stored. When the C command is executed, the Z80 registers are loaded from those memory
-locations.
+directly. 
+
+You will just need to modify the memory locations where the registers are 
+stored when a breakpoint occurs. When the C command is executed, the Z80 registers are 
+loaded from those memory locations.
 
 The locations are the following:
 
@@ -426,7 +428,7 @@ To do this, include the following line at the start of your program:
         LD      SP, 0FFFFH
 
 This instruction will load the Z80 Stack Pointer with 0FFFFH which will place the top
-of your stack space to the top of RAM memory.
+of your stack space at the top of RAM memory.
 
 
 I/O Ports
@@ -452,10 +454,10 @@ You will see:
 
 Now where did that 'A' come from?
 
-Well, you just write 'A' to the transmit port of the 68B50 serial port controller, which
+Well, you just wrote 'A' to the transmit port of the 68B50 serial port controller, which
 sent it to your terminal emulator program, which then displayed it!
 
-Try outputing to port 82H values like 0DH (carriage return) or 0AH (linefeed)!
+Try writing to port 82H values like 0DH (carriage return) or 0AH (linefeed)!
 
 
 
