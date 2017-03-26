@@ -673,5 +673,6 @@ CHROP:
         POP     HL
         RET
 
-
+        .ORG    0FFFH
+        DB      55H
                          
