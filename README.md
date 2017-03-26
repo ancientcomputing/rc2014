@@ -20,5 +20,11 @@ I have adapted to the RC2014, the original monitor program for Lee Hart's Z80 Me
 <p>
 The RC2014 monitor is a mostly full-function monitor that allows you to view and modify RAM contents, read/write I/O ports, upload Intel HEX files, execute programs, insert breakpoints (via the RST 30h instruction) and examine registers post breakpoint.
 <p>
+<hr>
+<p>
+Check out the documentation in the docs folder.
+<p>
+<hr>
+<p>
 Blog: http://ancientcomputing.blogspot.com
 
