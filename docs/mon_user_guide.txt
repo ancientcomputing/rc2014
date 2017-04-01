@@ -275,7 +275,7 @@ Now run the program again with g c000. What do you see?
 
 Inline Disassembler
 
-To really check that you made the right change, the Monitor/Debugger includes an inline
+To double check that you made the right change, the Monitor/Debugger includes an inline
 disassembler.
 
 At the Monitor prompt, press 'A' followed by c00c and ENTER. Thus:
@@ -352,7 +352,7 @@ the A register now contains 42H (the B character) because we incremented it with
 At this point, you can either press C to continue the program or ESC to return to the
 Monitor/Debugger.
 
-Let pressing C first.
+Let's try pressing C first.
 
 Now you will see the following:
         B
@@ -460,6 +460,28 @@ sent it to your terminal emulator program, which then displayed it!
 Try writing to port 82H values like 0DH (carriage return) or 0AH (linefeed)!
 
 
+!NEW! Monitor/Debugger with BASIC
+
+A new ROM image, monbas.rom, is available at the following URL:
+https://github.com/ancientcomputing/rc2014/tree/master/rom
+
+The monbas.rom image is a 16KB image that contains both the Monitor/Debugger and a 
+slightly tweaked BASIC.
+
+To use this, you will want to use Spencer's newest Pageable ROM Module board. Set it up
+for 16KB starting at address 0000H.
+
+By default, you will always boot to the Monitor/Debugger.
+
+To invoke BASIC, use the "G" command for address 1000H:
+        g 1000
+
+To warm start BASIC, use the 1003H address instead:
+        g 1003
+
+To switch back to the Monitor, use the "monitor" keyword in BASIC. It will basically
+restart the system.
+
 
 Tips and Tricks
 
@@ -473,6 +495,9 @@ To do this insert the following line to the end of your program:
 
 153H is the memory address (in hexadecimal) of the Monitor warm start routine.
 
+If you want to capture the contents of the CPU registers at the end of your program,
+just add a breakpoint to the end i.e. thr RST 30H instruction.
+
 
 Resetting the RC2014
 
@@ -485,6 +510,17 @@ Memory Map
 The Monitor/Debugger uses RAM from 8000H to 81FFH.
 
 Details of how this memory is used can be found in the source code.
+
+
+Serial Terminal Emulator
+
+I use a Mac for development along with an FTDI-based USB-to-serial cable. For the 
+terminal emulator, I use a program called Serial. 
+
+Serial gives you options to send files (either RAW or text) over to the RC2014.
+
+In order to slow down the transfers so that the RC2014 does not drop characters, I set
+up Serial for 1ms character delay. I also enable RTS/CTS flow control.
 
 
 
