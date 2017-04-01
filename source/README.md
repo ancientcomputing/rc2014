@@ -41,4 +41,6 @@ The Breakpoint feature here is new. You basically insert a "RST 30H" instruction
 When the Breakpoint is hit, the registers values will be shown. Press C to continue execution or ESC to return to the Monitor. When you are back in the Monitor, you can hit C to continue with your program, or R to see the register values at the Breakpoint.
 <p>
 If you are running a complex program and want to use the Breakpoint feature, please use your own stack i.e. set up the SP at the start of your program to 0FFFFh for example. The Breakpoint handler will restore SP to the Monitor stack which can clobber anything that you may already have on the stack.
+<p>
+More details can be found in the User Guide in the docs folder.
 
