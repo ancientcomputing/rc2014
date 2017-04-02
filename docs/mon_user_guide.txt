@@ -187,6 +187,11 @@ The '.' is a tick mark and indicates that there was one line of actual data. The
 also indicates that there was no error and that 17H bytes (number again in hexadecimal)
 was transferred.
 
+NOTE: Some cross-assemblers set up the load address correctly. However, they do not
+include the correct end-record line in the HEX file. If you see the HEX file load stop
+and not do anything, press ESC to quit the load process. You will then see the "HEX
+TRANSFER COMPLETE ERRORS=..." message.
+
 
 Execute Your Program!
 
