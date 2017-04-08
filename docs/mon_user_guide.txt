@@ -410,18 +410,18 @@ loaded from those memory locations.
 The locations are the following:
 
 Register        Address
-A               8104H
-BC              8106H
-DE              8108H
-HL              810AH
-A'              810CH
-BC'             810EH
-DE'             8110H
-HL'             8112H
-IX              8114H
-IY              8116H
-SP              811AH
-PC              811CH
+A               8034H
+BC              8036H
+DE              8038H
+HL              803AH
+A'              803CH
+BC'             803EH
+DE'             8040H
+HL'             8042H
+IX              8044H
+IY              8046H
+SP              804AH
+PC              804CH
 
 You can use the E command to change the registers individually, then use the C command
 to continue your program with the new register values.
