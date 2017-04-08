@@ -23,6 +23,8 @@
 ; 14. A User Guide is now available at:
 ;       https://github.com/ancientcomputing/rc2014/tree/master/docs
 ; 15. We now save the interrupt enable state (IFF2) during breakpoint handling
+; 16. Use 8030H onwards. Part of effort to use a 255 size serial receive buffer
+; 
 ;
 ; -----------------------------------------------------------------------------
 ;
@@ -54,43 +56,17 @@
 ;
 ; Operation concepts adapted from the Heathkit H8 computer.
 ;
-;Revision history of the original firmware.
-;0.1 	- RS-232 Full duplex operational. June 15
-;0.2 	- LED Put_Char routine operational
-;	- Keyboard Scanning operational
-;	- Demo Keyboard or RS-232 input Displays on both LED & RS-232 output
-;0.3	- Added a modified version of my IMSAI 8080 monitor
-;	- Modified Dump routine to output "M"
-;	- Added "M" function to enter Memory bytes
-;	- Fixed code to assemble using ASMX.
-;0.4	- First Beta Version.
-;	- Added Rest of Keyboard functionality (Alter Register, Memory, I/O, GO)
-;0.5	- Halt reset working
-;	- Single Step working
-;0.6	- Rewrote Register Save
-;	- F-0 Reset detection working
-;	- Fixed Display mode after Step
-;	- Removed "Test Code"
-;0.7	- Repurposed LED x7 to activate beeper on key down events
-;0.8	- Corrected bug introduced in v0.7 with lights
-;0.9	- Documentation improvements
-;	- UiVec now a Subroutine, terminate with RET
-;1.0	- Documentation improvements
-;	- Get Hexfile routine modified to timeout if bad data or if end-of-file record not received
-;	- X-Modem send & receive timeout values increased to allow more time to open/send or receive files
-;1.1	- Added Single Step to RS-232 Menu
+; Revision history of the original firmware in the original source code.
 ;
-;Note.  Some assemblers might choose to substitute Long Jumps (JP) with Relative Jumps (JR) when possible.
-;	These two instructions have different execution times.  Generally, this would not be an issue, however,
-;	within the RS-232 bit banging routines, timing is critical and it may not tolerate the substitution.
-;	The ASMX assembler supported by Herb Johnson's web site works great and does not substitute.
 ;
 ;------------------------------------------------------------------------------
 ;	Memory Map
 ;------------------------------------------------------------------------------
 ; System RAM utilization
-; 8000H-80FFH - BIOS
-; 8100H-81FFH - Monitor
+; 8000H-802FH - BIOS
+; 8030H - Monitor
+; ->80FF - Stack
+; 8100H-81FFH - Buffer
 ; 8200H onwards - BASIC
 
 ; Routines available in int32K.asm
@@ -118,9 +94,9 @@ nmivector	.EQU	vecTableStart+21	; Actual vector is at +22
 vecTableLength	.EQU	24	; 8x3
 vecTableEnd	.EQU	$8020
 
-MON_RAM		equ	8100H	; Start of Monitor RAM scratch space
+MON_RAM		equ	8030H	; Start of Monitor RAM scratch space
 
-StackTop	equ	81FFH	; Stack = 0x81FF (Next Stack Push Location = 0x81FE)
+StackTop	equ	80FFH	; Stack = 0x80FF (Next Stack Push Location = 0x80FE)
 
 hex_buffer	equ	MON_RAM		; Offset for Intel HEX uploads
 BRKPOINT	equ	MON_RAM+2	; Flag to indicate that we've hit a breakpoint and that the saved registers are valid
@@ -227,12 +203,12 @@ MM_CC:
 DO_HELP:
 		CALL 	PRINTI		;Display Help when input is invalid
 VERSION:
-		DB	CR,LF,"Monitor/Debugger v0.6.1 for RC2014"
+		DB	CR,LF,"Monitor/Debugger v0.7.0 for RC2014"
 		DB	CR,LF,"?              Print this help"
 		DB      CR,LF,"A XXXX         Disassemble from XXXX"
 		DB	CR,LF,"C              Continue from Breakpoint"
 		DB	CR,LF,"D XXXX         Dump memory from XXXX"
-		DB	CR,LF,"E XXXX         Edit memory from XXXX"
+		DB	CR,LF,"E XXXX         Edit memory from XXXX; CR to skip"
 		DB	CR,LF,"G XXXX         Go execute from XXXX"
 		DB	CR,LF,"H XXXX         Set HEX file start address to XXXX"
 		DB	CR,LF,"I XX           Input from port XX"
@@ -333,11 +309,15 @@ ME_LP:
 		; A = non-hex char input (if CY=1)
 		CALL	SPACE_GET_BYTE	; Input new value or Exit if invalid
 		JR	NC, ME_LP0	; Valid byte
+		; Not valid hex character
+		CP      A, CR          ; Did we hit a RETURN?
+		JR      Z, ME_LP1       ; Yes, skip saving anything and inc hl
 		JP	MAIN_MENU	; Invalid byte, C=1 -> exit
 ME_LP0:
 		LD	(HL), A		; Save new value
 		LD	A, (HL)		; Read back value
 		CALL	SPACE_PRINT_BYTE
+ME_LP1:
 		INC	HL		;Advance to next location
 		JR	ME_LP		;repeat input
 
@@ -358,7 +338,8 @@ GE_0:
 		LD	H,D
 		LD	L,E
 		CALL	PRINT_HL
-		
+		LD      HL, MAIN_MENU
+		PUSH    HL              ; Save return address so that we can do a RET
 		LD	HL, DE
 		JP	(HL)		; HL contains the target address	
 

@@ -6,11 +6,7 @@ This repo holds my changes.
 <p>
 The original code is at searle.hostei.com/grant
 <p>
-The primary changes are to use a RAM-based interrupt vector table for all RST xx calls and hardware interrupts.
-<p>
-This gives us more flexibility in swapping in alternative serial IRQ handlers, and console I/O for BASIC.
-<p>
-Some minor changes were made so that the ZASM cross-assembler worked.
+New changes for version 0.7.0 include support for a 255-byte receive buffer. This removes the need for character line delays in many cases when uploading programs and files.
 <p>
 The primary RC2014 Github repo is at: https://github.com/RC2014Z80/RC2014
 <p>

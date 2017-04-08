@@ -277,6 +277,8 @@ hexadecimal value for '0'. Thus:
 
 Now run the program again with g c000. What do you see?
 
+Tip: If you want to skip over an address to keep its value, you can hit RETURN
+
 
 Inline Disassembler
 
@@ -503,6 +505,10 @@ To do this insert the following line to the end of your program:
 If you want to capture the contents of the CPU registers at the end of your program,
 just add a breakpoint to the end i.e. thr RST 30H instruction.
 
+Update: The new 0.7.0 version of the Monitor/Debugger/BASIC pushes the entry point of
+the Monitor before calling your program. So you can use a simply RET to return to the
+Monitor. Assuming that you did not change the stack, of course!
+
 
 Resetting the RC2014
 
@@ -526,6 +532,10 @@ Serial gives you options to send files (either RAW or text) over to the RC2014.
 
 In order to slow down the transfers so that the RC2014 does not drop characters, I set
 up Serial for 1ms character delay. I also enable RTS/CTS flow control.
+
+Update: The new 0.7.0 of the Monitor/Debugger/BASIC implements a 255-byte receive
+buffer. I have found that with RTS/CTS enabled, I can reduce the character delay down
+to zero.
 
 
 
