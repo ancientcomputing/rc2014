@@ -70,8 +70,8 @@
 ; 8200H onwards - BASIC
 
 ; Routines available in int32K.asm
-BIOS_PRINT	.EQU	0069H
-BIOS_PRINT_CRLF	.EQU	006CH
+;BIOS_PRINT	.EQU	0069H
+;BIOS_PRINT_CRLF	.EQU	006CH
 
 ; John Kerr's Disassembler
 ; For use in RAM
@@ -82,7 +82,7 @@ BIOS_PRINT_CRLF	.EQU	006CH
 DISZ80         .EQU    0B00H
 
 ; RST xx vector table (from int32K.asm)
-vecTableStart	.EQU	$8000
+vecTableStart	.EQU	8000H
 rst08vector	.EQU	vecTableStart		; Actual vector is at +1
 rst10vector	.EQU	vecTableStart+3		; Actual vector is at +4
 rst18vector	.EQU	vecTableStart+6		; Actual vector is at +7
@@ -92,7 +92,9 @@ rst30vector	.EQU	vecTableStart+15	; Actual vector is at +16
 rst38vector	.EQU	vecTableStart+18	; Actual vector is at +19
 nmivector	.EQU	vecTableStart+21	; Actual vector is at +22
 vecTableLength	.EQU	24	; 8x3
-vecTableEnd	.EQU	$8020
+vecTableEnd	.EQU	8020H
+
+bootFlag        .EQU     vecTableEnd+6          ; From int32K.asm
 
 MON_RAM		equ	8030H	; Start of Monitor RAM scratch space
 
@@ -143,8 +145,44 @@ ESC		equ	27
 ; This part is from bas32K.asm
 ; int32K.asm is written to jump here
 
-COLD:   	JP      MON_COLD	; STARTB          ; Jump for cold start
-WARM:   	JP      MON_WARM	; WARMST          ; Jump for warm start
+                JP      MON_ENTRY
+                JP      MON_WARM    
+;COLD:   	JP      MON_COLD	; STARTB          ; Jump for cold start
+;WARM:   	JP      MON_WARM	; WARMST          ; Jump for warm start
+
+;------------------------------------------------------------------------------
+; Jump tables for use by the BIOS
+                JP      PRINT_NEW_LINE
+                JP      PRINT
+
+;------------------------------------------------------------------------------
+; Monitor entry point
+
+SIGNON2:        .BYTE   CR,LF
+		.BYTE	"C/W?",0
+		
+MON_ENTRY:
+                LD       A,(bootFlag)   ; Check if we had previously booted
+                CP       'Y'             ; to see if this is power-up
+                JR       NZ,COLDSTART    ; If not BASIC started then always do cold start
+                LD       HL,SIGNON2      ; Cold/warm message
+                CALL     PRINT           ; Output string
+CORW:
+                RST     10H
+                AND      %11011111       ; lower to uppercase
+                CP       'C'
+                JR       NZ, CHECKWARM
+	        CALL	PRINT_NEW_LINE
+COLDSTART:     
+                LD       A,'Y'           ; Set the BASIC STARTED flag
+                LD       (bootFlag),A
+                JP       MON_COLD        ; monitor COLD
+CHECKWARM:
+                CP       'W'
+                JR       NZ, CORW
+                RST      08H
+                CALL     PRINT_NEW_LINE
+                JP       MON_WARM
 
 ;------------------------------------------------------------------------------
 ; MAIN MENU
@@ -203,7 +241,7 @@ MM_CC:
 DO_HELP:
 		CALL 	PRINTI		;Display Help when input is invalid
 VERSION:
-		DB	CR,LF,"Monitor/Debugger v0.7.0 for RC2014"
+		DB	CR,LF,"Monitor/Debugger v0.7.1"
 		DB	CR,LF,"?              Print this help"
 		DB      CR,LF,"A XXXX         Disassemble from XXXX"
 		DB	CR,LF,"C              Continue from Breakpoint"
@@ -266,7 +304,7 @@ DL_P1L:		; Start of print byte loop
 		DJNZ	DL_P1L		; Loop next byte
 ;DL_P2:
 		CALL	PRINTI		;Print Seperator between part 1 and part 2
-		DB	" ; ",EOS
+		DB	" ; ", EOS
 
 		; Print characters
 DL_PSL2:
@@ -275,14 +313,14 @@ DL_PSL2:
 		
 		; Print ASCII characters
 DL_P2L:		; Start of print ASCII loop
-		LD	A,(HL)
+		LD	A, (HL)
 		CP	' '		;A - 20h	Test for Valid ASCII characters
 		JR	NC, DL_P2K1
-		LD	A,'.'				;Replace with . if not ASCII
+		LD	A, '.'				;Replace with . if not ASCII
 DL_P2K1:
-		CP	0x7F		;A - 07Fh
+		CP	7FH		;A - 07Fh
 		JR	C, DL_P2K2
-		LD	A,'.'
+		LD	A, '.'
 DL_P2K2:
 		CALL	PUT_CHARBC
 		INC	HL
@@ -731,8 +769,17 @@ PUT_CHARBC:
 ; PRINT -- Print A null-terminated string @(HL)
 ; Original code: HL points to byte past the EOS
 ; BIOS code: HL points to EOS. But that is okay because EOS = NOP!!
-
-PRINT:		JP	BIOS_PRINT
+;PRINT:		JP	BIOS_PRINT
+;------------------------------------------------------------------------------
+; Input: HL points to the string
+; Exit; A is changed, HL points to EOS
+PRINT:          LD       A,(HL)          ; Get character
+                OR       A               ; Is it 00H ?
+                RET      Z               ; Then RETurn on terminator
+                RST      08H             ; Print it
+                INC      HL              ; Next Character
+                JR       PRINT           ; Continue until 00H
+                RET
 
 ; -----------------------------------------------------------------------------
 ; PRINT IMMEDIATE
@@ -815,14 +862,21 @@ PRINT_SPACE:	LD	A, ' '
 ;pre: none
 ;post: 0x0A printed to console
 
+;------------------------------------------------------------------------------
+; Exit: A is changed
 PRINT_NEW_LINE:
-		JP	BIOS_PRINT_CRLF	;006CH		; Call BIOS
+;		JP	BIOS_PRINT_CRLF	;006CH		; Call BIOS
+                LD        A, 0DH
+		RST       08H
+		LD        A, 0AH
+		RST       08H
+		RET
 
 ;------------------------------------------------------------------------------
 
-ADD_HL_A	ADD	A,L		;4
-		LD	L,A		;4
-		RET NC			;10
+ADD_HL_A	ADD	A, L
+		LD	L, A
+		RET     NC
 		INC	H
 		RET
 

@@ -6,7 +6,9 @@
 ; flexibility for developers
 ; 4. Shift original RAM use up 20h to leave space for the vector table
 ; 5. Shorten messages etc and squeeze everything in under original 150h code length
-; 6. 256 buffer
+; 6. 256-char buffer
+; 7. Move stuff into mon32K.asm so that we'll have more space to handle different types
+; of UART
 ; 
 ; All mods to original code are copyright Ben Chong and freely licensed to the community
 ; Developed for the RC2014 (rc2014.co.uk)
@@ -26,6 +28,10 @@
 ; updated the web page hosting service.
 ;
 ;==================================================================================
+
+; Monitor code that we want to access
+MON_PRINT_NEWLINE       .EQU    0156H
+MON_PRINT               .EQU    0159H 
 
 ; Non-memory, non-IO port defines
 SER_BUFSIZE     .EQU     0FFH   ; Size of buffer
@@ -65,14 +71,15 @@ vecTableEnd	.EQU	$8020
 serInPtr        .EQU     vecTableEnd
 serRdPtr        .EQU     vecTableEnd+2
 serBufUsed      .EQU     vecTableEnd+4
-basicStarted    .EQU     vecTableEnd+6
+bootFlag        .EQU     vecTableEnd+6
 serErrCount     .EQU     vecTableEnd+8          ; Count number of serial overflow errors
 TEMPSTACK       .EQU     80FFH	; serBuf+$ED	; $80ED ; Top of BASIC line input buffer so is "free ram" when BASIC resets
 
 serBuf          .EQU     8100H  ; vecTableEnd	; 8020H (was $8000)
 
-monCold         .EQU    0150H
-monWarm         .EQU    0153H
+monStart        .EQU    0150H
+;monCold         .EQU    0150H
+;monWarm         .EQU    0153H
 
                 .ORG $0000
 ;------------------------------------------------------------------------------
@@ -140,20 +147,12 @@ vecTabProto	JP	TXA			; RST 08
 ;------------------------------------------------------------------------------
 
 SIGNON1:       .BYTE     CS
-		.BYTE	CR,LF,"BIOS",0
-SIGNON2:       .BYTE     CR,LF
-		.BYTE	"C/W?",0
+		.BYTE	CR,LF,"Z80 BIOS",0
 		
 ;------------------------------------------------------------------------------
 ; NMI
                 .ORG 0066H
                 JP	nmivector
-				
-;------------------------------------------------------------------------------
-		; 0069H
-		JP	PRINT
-		; 006CH
-		JP	PRINT_NEW_LINE
 
 ;------------------------------------------------------------------------------
 ; Serial interrupt handler
@@ -265,69 +264,35 @@ conout1:        IN       A,($80)         ; Status byte
 CKINCHAR        LD       A,(serBufUsed)
                 CP       A, $0
                 RET
-
-;------------------------------------------------------------------------------
-; Input: HL points to the string
-; Exit; A is changed, HL points to EOS
-PRINT:          LD       A,(HL)          ; Get character
-                OR       A               ; Is it $00 ?
-                RET      Z               ; Then RETurn on terminator
-                RST      08H             ; Print it
-                INC      HL              ; Next Character
-                JR       PRINT           ; Continue until $00
-                RET
-        
-;------------------------------------------------------------------------------
-; Exit: A is changed
-PRINT_NEW_LINE:
-                LD        A,$0D
-		RST       08H
-		LD        A,$0A
-		RST       08H
-		RET
-                       
+          
 ;------------------------------------------------------------------------------
 INIT:
-               ; Set up vector table first
-               LD	HL, vecTabProto
-               LD	DE, vecTableStart
-               LD	BC, 24
-               LDIR		
+                ; Set up vector table first
+                LD	HL, vecTabProto
+                LD	DE, vecTableStart
+                LD	BC, 24
+                LDIR		
                
-               LD        HL,TEMPSTACK    ; Temp stack
-               LD        SP,HL           ; Set up a temporary stack
-               LD        HL,serBuf
-               LD        (serInPtr),HL
-               LD        (serRdPtr),HL
-               XOR       A               ;0 to accumulator
-               LD        (serBufUsed),A
-               LD        (serErrCount), A
-               LD        A,RTS_LOW
-               OUT       ($80),A         ; Initialise ACIA
-               IM        1
-               EI
-               LD        HL,SIGNON1      ; Sign-on message
-               CALL      PRINT           ; Output string
-               LD        A,(basicStarted); Check the BASIC STARTED flag
-               CP        'Y'             ; to see if this is power-up
-               JR        NZ,COLDSTART    ; If not BASIC started then always do cold start
-               LD        HL,SIGNON2      ; Cold/warm message
-               CALL      PRINT           ; Output string
-CORW:
-               CALL      RXA
-               AND       %11011111       ; lower to uppercase
-               CP        'C'
-               JR        NZ, CHECKWARM
-	       CALL	PRINT_NEW_LINE
-COLDSTART:     LD        A,'Y'           ; Set the BASIC STARTED flag
-               LD        (basicStarted),A
-               JP        monCold        ; monitor COLD
-CHECKWARM:
-               CP        'W'
-               JR        NZ, CORW
-               RST       08H
-               CALL     PRINT_NEW_LINE
-               JP        monWarm
+                LD       HL, TEMPSTACK  ; Temp stack
+                LD       SP, HL         ; Set up a temporary stack
+                LD       HL, serBuf
+                LD       (serInPtr), HL
+                LD       (serRdPtr), HL
+                XOR      A              ;0 to accumulator
+                LD       (serBufUsed), A
+                LD       (serErrCount), A
+                ; Initialize UART
+                LD       A, RTS_LOW
+                OUT      ($80), A       ; Initialise ACIA
+                
+                ; Initialize Interrupt mode
+                IM       1
+                ; Enable Interrupt
+                EI
+                LD       HL, SIGNON1    ; Sign-on message
+                CALL     MON_PRINT      ; Output string
+                JP       0150H          ; Jump to monitor
+
               
 		.ORG 0150H
               
