@@ -1,0 +1,541 @@
+Monitor/Debugger for the RC2014
+User Guide
+
+Acknowledgements
+
+The Monitor/Debugger for the RC2014 is based heavily on work done by others. 
+Acknowledgements are in the source code.
+
+
+Introduction
+
+The Monitor/Debugger for the RC2014 is a "machine language" monitor that is very similar
+in functionality to those shipped with the original microcomputers of the late 1970s to
+early 1980s. This with the exception that user interaction is with a serial terminal as
+opposed to a bunch of switches and LED hexadecimal displays as with the earliest 
+microcomputers.
+
+A Monitor/Debugger allows users to type in programs that they have assembled into machine
+code: the actual instructions that microprocessors recognize. It also allows users to
+examine and modify memory, execute programs, and set breakpoints and view registers when 
+breakpoints are hit.
+
+Many early microcomputers only came with a Monitor/Debugger. Advanced languages like BASIC
+were only available as an upgrade. Later home computers dispensed with the Monitor/
+Debugger and only shipped with a version of BASIC or even FORTH!
+
+The Monitor/Debugger for the RC2014 was written for folks developing Z80 assembly code
+and wanting to load, run and debug their programs on the RC2014.
+
+
+Installation
+
+The Monitor/Debugger binary is less than 4KB in size. It can be burned into a 27C512 
+EPROM that is similar to the one that comes with the RC2014. You can also burn it into a
+28C256 if you know how to configure the RC2014 e.g. connecting Jumper 4 on the RC2014 
+Mini to Vcc.
+
+The Monitor/Debugger binary filename is "mon.rom" and is found here:
+https://github.com/ancientcomputing/rc2014/tree/master/rom
+
+
+Boot
+
+Boot the RC2014 normally e.g. connect the serial line to a computer running a terminal
+emulator or an actual serial terminal, connect the power if applicable, then press and 
+release the reset button.
+
+You will see the following:
+  RC2014
+  Monitor >
+
+The second line is the monitor's command line prompt.
+
+If you press the reset button again, you will see
+  RC2014
+  C/W?
+
+Press C for cold boot or W for warm boot.
+
+Press W if you want to look at saved breakpoint registers. 
+
+
+Monitor Commands
+
+When presented with the monitor's command line prompt, you can press a key (on the 
+terminal or terminal emulator) to enter a command.
+
+Valid monitor commands are:
+?              Print this help
+A XXXX         Disassemble from XXXX
+C              Continue from Breakpoint
+D XXXX         Dump memory from XXXX
+E XXXX         Edit memory from XXXX
+G XXXX         Go execute from XXXX
+H XXXX         Set HEX file start address to XXXX
+I XX           Input from port XX
+O XX YY        Output YY to port XX
+R              Display registers from Breakpoint
+:sHLtD...C     Load Intel HEX file, ':' is part of file
+
+Pressing '?' will print the list of valid commands.
+
+
+Running a program on the RC2014
+
+Let's look at how you can load and execute programs on the RC2014 using the 
+Monitor/Debugger.
+
+Most Z80 assemblers or cross-assemblers will generate an Intel HEX file. This file
+contains the executable Z80 machine code, but in a human readable format. Although you
+will be hardpressed to understand any of it!
+
+To run your new program on the RC2014, you will need to load the code into the RC2014 RAM.
+
+Let's assume that you've written the following little program:
+
+        .ORG 0C000H
+        LD      HL, 0
+START:
+        LD      A, 0AH
+        RST     08H
+        LD      A, 0Dh
+        RST     08H
+        LD      A, 'A'
+LOOP1:
+        RST     08H
+        INC     A
+        CP      A, 'Z'+1
+        JR      NZ, LOOP1
+        JP      START
+
+This little program will print the characters A to Z horizontally, then start all over 
+again on a new line.
+
+To make this program understandable by a Z80 processor, you will need to assemble it to
+generate machine code.
+
+I use the zasm cross-assembler for this. You may use other assemblers.
+
+With zasm, you would type in the following command:
+        zasm -u -x test.asm
+        
+Where test.asm is the text file that contains this little program.
+
+zasm will produce a file called test.hex. If you open this file with a text editor, you 
+will see the following contents:
+
+        :170000002100003E0ACF3E0DCF015A5A3E41CF3CFE5B20FAC303C05F
+        :00000001FF
+        
+The leading ':' symbols at the beginning of each line indicates that this is an Intel
+HEX file.
+
+The Monitor/Debugger is able to automatically understand that a ':' command means that 
+the next set of data that comes over the serial console is the rest of the Intel HEX 
+file.
+
+You can either copy the file from the test editor and then paste it onto the terminal
+emulator or use, if available, the built-in functions of your terminal emulator to send 
+the Intel HEX file over.
+
+For example, I use the Serial terminal emulator on a Mac. This program has a "Send Text
+File" feature (Command-T). When I hit Command-T, it will ask me to choose a file to send
+over to the RC2014 over the serial port.
+
+
+HEX File Start Address
+
+Before we send over the Intel HEx file, we need to understand the assembler that 
+we're using and how it generates an Intel HEX file.
+
+This is because, when you write a Z80 program, you need to specify where in the memory
+space the program will reside and run. Unlike recent microprocessors, Z80 code is not
+location independent without a lot of work. Immediate jump instructions, for example, 
+may use absolute addresses.
+
+In our little test program, we used the ".ORG 0C000H" command. This means that we have
+assembled the code to run from memory location 0C00H (in hexadecimal values).
+
+Unfortunately, zasm doesn't include this information in the Intel HEX file. So if you 
+were to load test.hex, it will end up being written to location 0000H. This of course 
+does not do anything since the Monitor/Debugger ROM resides in ROM in that location.
+
+So before loading the test.hex file, you need to run the following command:
+        h c000
+
+Just press 'h' followed by 'c000' and ENTER.
+
+What this does is to set the load address of the Intel HEX file data at memory location
+0C000h which is where the test program need to be located in order to execute correctly.
+
+
+Sending an Intel HEX file to the RC2014
+
+Once you have set up the 'H' parameter, it is time to send the Intel HEX file to the 
+RC2014.
+
+Again, you can copy contents of the file, then paste it onto the terminal emulator
+console at the Monitor > prompt.
+
+You will get the following:
+
+Monitor >:.
+HEX TRANSFER COMPLETE ERRORS=00 0017 BYTES TRANSFERRED
+
+The '.' is a tick mark and indicates that there was one line of actual data. The result
+also indicates that there was no error and that 17H bytes (number again in hexadecimal)
+was transferred.
+
+NOTE: Some cross-assemblers set up the load address correctly. However, they do not
+include the correct end-record line in the HEX file. If you see the HEX file load stop
+and not do anything, press ESC to quit the load process. You will then see the "HEX
+TRANSFER COMPLETE ERRORS=..." message.
+
+
+Execute Your Program!
+
+Now that you have successfully transferred the program to the RC2014, let's run it!
+
+To run the program, type the following at the Monitor prompt:
+        g c000<ENTER>
+
+What do you see?
+
+Since we did not include any checks in the program, the only way to halt it is to reset
+the RC2014.
+
+Once you hit reset, you will be prompted with:
+        C/W?
+
+Hit 'W' for warm start.
+
+
+Exploring Memory Contents
+
+Now, you may want to double check the contents of the test program at memory location
+C000H.
+
+To do this, hit 'D' at the command prompt, followed by the memory address and ENTER:
+        d c000<ENTER>
+
+This will give you the following output:
+
+        C000  21 00 00 3E 0A CF 3E 0D CF 01 5A 5A 3E 41 CF 3C ; !..>..>...ZZ>A.<
+        C010  FE 5B 20 FA C3 03 C0 00 00 00 10 00 00 00 01 00 ; .[ .............
+        C020  FF FF 7F F6 EF 9F DF EF FE FE FF FE FF 7E FF F7 ; .............~..
+        C030  00 00 00 20 10 80 00 00 00 00 00 00 00 00 00 00 ; ... ............
+        C040  8A CB 45 F5 93 FE 8C DD 02 31 E4 32 EF DB F3 68 ; ..E......1.2...h
+        C050  00 40 00 40 04 20 08 00 00 00 00 00 20 00 00 20 ; .@.@. ...... .. 
+        C060  A2 C6 B2 DB F9 C0 7E 3C EE C0 2C 72 73 4A F8 AA ; ......~<..,rsJ..
+        C070  80 44 00 00 20 80 10 00 48 00 22 04 48 00 28 40 ; .D.. ...H.".H.(@
+        C080  BC FC 3F FF FB FD FF DF FF FF FF BF F7 FF FF FE ; ..?.............
+        C090  00 00 00 80 00 00 00 00 00 00 00 00 00 00 00 00 ; ................
+        C0A0  80 BE 97 E4 DD 52 84 6D 0F DB BD 11 FE 53 C8 E0 ; .....R.m.....S..
+        C0B0  00 00 10 00 00 10 00 00 00 80 00 00 00 01 00 20 ; ............... 
+        C0C0  A0 23 E7 1B 73 99 7E FD 9E DB D1 F3 B7 B5 96 2A ; .#..s.~........*
+        C0D0  08 00 40 00 00 18 50 04 0A 00 20 00 00 10 C0 02 ; ..@...P... .....
+        C0E0  38 E3 EB ED AB 87 F3 F3 31 7B BF DB 58 C3 3A 20 ; 8.......1{..X.: 
+        C0F0  00 01 00 00 00 00 08 00 00 00 00 04 00 08 20 00 ; .............. .
+        Press any key to continue, ESC to abort
+
+As you can see the first byte of the "LD HL,0" instruction is at location C000H.
+
+At this point, you can press any key to see memory at C100H onwards.
+
+Alternatively, you can press ESC to go back to the Monitor prompt.
+
+
+Examining and Changing Memory
+
+What if you want to change your program without reassembling it and reloading the
+Intel HEX file?
+
+For example, in the test program, I want to start the print out with '0' instead of 'A'.
+
+The instruction that loads the A register with 'A' is located at memory location C00CH.
+This can be seen from the test.lst file that is generated when you run zasm.
+
+At the Monitor prompt, hit E followed by c000 and ENTER:
+        e c000<ENTER> 
+
+You will see:
+        C00C : 3E
+
+Where 3E is the LD A instruction. Press 3E to enter the same value. You will see:
+        C00C : 3E 3e 3E
+
+Where the second 3e is what you typed and the third 3E is a confirmation that the value
+was written to memory and successfully read back.
+
+You will then see the content on the next memory location:
+        C00D : 41
+
+Now, 41 is the hexadecimal value for 'A'. To insert '0' instead, type 30 which is the
+hexadecimal value for '0'. Thus:
+        C00D : 41 30 30
+
+Now run the program again with g c000. What do you see?
+
+Tip: If you want to skip over an address to keep its value, you can hit RETURN
+
+
+Inline Disassembler
+
+To double check that you made the right change, the Monitor/Debugger includes an inline
+disassembler.
+
+At the Monitor prompt, press 'A' followed by c00c and ENTER. Thus:
+        a c00c<ENTER>
+
+You will see the following:
+
+        Disassemble from C00C
+        Press any key to step, ESC to abort
+        C00C 3E 30       LD   A,30H
+
+As you can see, 30H is the new value being loaded into the A register.
+
+If you were to press any key (other than ESC), the disassembler will disassemble the next
+instruction. Hence:
+        C00E CF          RST  8 
+
+This is the system call to print a character on the screen. Continue press any key to
+look at the other instructions of the test program.
+
+Then press ESC to return to the Monitor prompt.
+
+
+Breakpoints
+
+Breakpoints are places in your program where you pause the program execution. Generally
+you want to use a breakpoint to understand the state of the Z80 registers and memory 
+contents at a given point in your program. This is very useful for debugging and for 
+learning the effect of using certain Z80 instructions that you are unfamiliar with.
+
+To set a breakpoint, all you need to do is to insert the 'RST 30H' instruction where you
+want your program to pause.
+
+Let's insert a breakpoint just before the conditional jump instruction. The test program
+will now look like:
+
+        .ORG 0C000H
+        LD      HL, 0
+START:
+        LD      A, 0AH
+        RST     08H
+        LD      A, 0Dh
+        RST     08H
+        LD      A, 'A'
+LOOP1:
+        RST     08H
+        INC     A
+        CP      A, 'Z'+1
+        RST     30H
+        JR      NZ, LOOP1
+        JP      START
+
+Now assemble the program and load the resulting Intel HEX file to the RC2014. Then use 
+G command to run the program.
+
+You will see the following:
+        A
+        Breakpoint at PC=C012
+        AF =429B  BC =5A5A  DE =C000  HL =0000  
+        AF'=4D09  BC'=FFFF  DE'=FF03  HL'=4D09  
+        IX =0018  IY =0000  IR =007F  SP =81FF  
+        Press C to continue or ESC to return to Monitor
+
+The first line you see is the output of your program, when it prints the letter 'A'.
+
+Then you see the breakpoint message, telling you that the breakpoint occurred when the 
+Z80 was executing the instruction at 0C012H. This is the location where the breakpoint
+instruction (RST 30H) is located.
+
+The next 3 lines show the contents of the various Z80 registers. You can see here that
+the A register now contains 42H (the B character) because we incremented it with the 
+'INC A' instruction.
+
+At this point, you can either press C to continue the program or ESC to return to the
+Monitor/Debugger.
+
+Let's try pressing C first.
+
+Now you will see the following:
+        B
+        Breakpoint at PC=C012
+        AF =439B  BC =5A5A  DE =C000  HL =0000  
+        AF'=4D09  BC'=FFFF  DE'=FF03  HL'=4D09  
+        IX =0018  IY =0000  IR =0040  SP =81FF  
+        Press C to continue or ESC to return to Monitor
+
+The first line is the program printing out the 42H value from the A register. This is
+again followed by the breakpoint message, then the contents of the registers.
+
+Now press ESC to return to the Monitor/Debugger. You will now see the Monitor prompt.
+
+From the Monitor prompt, you can use the various commands we have already reviewed e.g. 
+to look at or modify memory contents etc.
+
+However, from the Monitor prompt, you can also press C. This command will continue the
+test program from the last breakpoint!
+
+Try it!
+
+You will see:
+        C
+        Breakpoint at PC=C012
+        AF =449B  BC =5A5A  DE =C000  HL =0000  
+        AF'=4D09  BC'=FFFF  DE'=FF03  HL'=4D09  
+        IX =0018  IY =0000  IR =0001  SP =81FF  
+        Press C to continue or ESC to return to Monitor
+
+Where the first line is the next character in the A register that is now being printed 
+out.
+
+Press ESC to return to the Monitor prompt.
+
+From the Monitor prompt, you can press R to look at the contents of the registers.
+
+
+Changing Register Contents
+
+The Monitor/Debugger does not have a command to allow you to change breakpoint registers
+directly. 
+
+You will just need to modify the memory locations where the registers are 
+stored when a breakpoint occurs. When the C command is executed, the Z80 registers are 
+loaded from those memory locations.
+
+The locations are the following:
+
+Register        Address
+A               8034H
+BC              8036H
+DE              8038H
+HL              803AH
+A'              803CH
+BC'             803EH
+DE'             8040H
+HL'             8042H
+IX              8044H
+IY              8046H
+SP              804AH
+PC              804CH
+
+You can use the E command to change the registers individually, then use the C command
+to continue your program with the new register values.
+
+IMPORTANT NOTE:
+The breakpoint handler code in the Monitor/Debugger will switch to the Monitor stack. If
+your application works with data on the stack or use subroutines, you will want to use
+your own stack space.
+
+To do this, include the following line at the start of your program:
+        LD      SP, 0FFFFH
+
+This instruction will load the Z80 Stack Pointer with 0FFFFH which will place the top
+of your stack space at the top of RAM memory.
+
+
+I/O Ports
+
+The I command allows you to read from an input port.
+
+At the Monitor prompt, press I followed by the port address:
+        I 80
+
+You will see:
+        i 80 02
+
+The value 02H is what is read from the port 80H which is the 68B50 serial port controller
+of the RC2014.
+
+The O command allows you to write a byte to an output port.
+
+At the Monitor prompt, press O followed by the port address and data you want to output:
+        I 82 41
+
+You will see:
+        o 82 41A
+
+Now where did that 'A' come from?
+
+Well, you just wrote 'A' to the transmit port of the 68B50 serial port controller, which
+sent it to your terminal emulator program, which then displayed it!
+
+Try writing to port 82H values like 0DH (carriage return) or 0AH (linefeed)!
+
+
+!NEW! Monitor/Debugger with BASIC
+
+A new ROM image, monbas.rom, is available at the following URL:
+https://github.com/ancientcomputing/rc2014/tree/master/rom
+
+The monbas.rom image is a 16KB image that contains both the Monitor/Debugger and a 
+slightly tweaked BASIC.
+
+To use this, you will want to use Spencer's newest Pageable ROM Module board. Set it up
+for 16KB starting at address 0000H.
+
+By default, you will always boot to the Monitor/Debugger.
+
+To invoke BASIC, use the "G" command for address 1000H:
+        g 1000
+
+To warm start BASIC, use the 1003H address instead:
+        g 1003
+
+To switch back to the Monitor, use the "monitor" keyword in BASIC. It will basically
+restart the system.
+
+
+Tips and Tricks
+
+Returning to the Monitor
+
+To return to the Monitor/Debugger from your program, you can jump to the Monitor
+warm start entry point. 
+
+To do this insert the following line to the end of your program:
+        JP      153H
+
+153H is the memory address (in hexadecimal) of the Monitor warm start routine.
+
+If you want to capture the contents of the CPU registers at the end of your program,
+just add a breakpoint to the end i.e. thr RST 30H instruction.
+
+Update: The new 0.7.0 version of the Monitor/Debugger/BASIC pushes the entry point of
+the Monitor before calling your program. So you can use a simply RET to return to the
+Monitor. Assuming that you did not change the stack, of course!
+
+
+Resetting the RC2014
+
+To reset the RC2014 from your program, just jump to memory location 0. Thus:
+        JP      0H
+
+
+Memory Map
+
+The Monitor/Debugger uses RAM from 8000H to 81FFH.
+
+Details of how this memory is used can be found in the source code.
+
+
+Serial Terminal Emulator
+
+I use a Mac for development along with an FTDI-based USB-to-serial cable. For the 
+terminal emulator, I use a program called Serial. 
+
+Serial gives you options to send files (either RAW or text) over to the RC2014.
+
+In order to slow down the transfers so that the RC2014 does not drop characters, I set
+up Serial for 1ms character delay. I also enable RTS/CTS flow control.
+
+Update: The new 0.7.0 of the Monitor/Debugger/BASIC implements a 255-byte receive
+buffer. I have found that with RTS/CTS enabled, I can reduce the character delay down
+to zero.
+
+
+

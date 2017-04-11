@@ -5,7 +5,10 @@
 ; 3. Use RAM-based vector table for interrupts and RST instructions for better
 ; flexibility for developers
 ; 4. Shift original RAM use up 20h to leave space for the vector table
-; 5. Shorten messages etc and squeeze everything in under original 150h code length      
+; 5. Shorten messages etc and squeeze everything in under original 150h code length
+; 6. 256-char buffer
+; 7. Move stuff into mon32K.asm so that we'll have more space to handle different types
+; of UART
 ; 
 ; All mods to original code are copyright Ben Chong and freely licensed to the community
 ; Developed for the RC2014 (rc2014.co.uk)
@@ -26,15 +29,38 @@
 ;
 ;==================================================================================
 
+; Monitor code that we want to access
+MON_PRINT_NEWLINE       .EQU    0156H
+MON_PRINT               .EQU    0159H 
+
+; Non-memory, non-IO port defines
+SER_BUFSIZE     .EQU     0FFH   ; Size of buffer
+SER_FULLSIZE    .EQU     0C0H   ; Trigger for RTS deassertion
+SER_EMPTYSIZE   .EQU     010H   ; Trigger for RTS assertion
+
+RTS_HIGH        .EQU     0D6H
+RTS_LOW         .EQU     096H
+
+CR              .EQU     0DH
+LF              .EQU     0AH
+CS              .EQU     0CH             ; Clear screen
+
+; System RAM utilization
+; 8000H-802FH - BIOS
+; 8030H - Monitor
+; ->80FF - Stack
+; 8100H-81FFH - Buffer
+; 8200H onwards - BASIC
+
 vecTableStart	.EQU	$8000
-rst08vector	.EQU	vecTableStart
-rst10vector	.EQU	vecTableStart+3
-rst18vector	.EQU	vecTableStart+6
-rst20vector	.EQU	vecTableStart+9
-rst28vector	.EQU	vecTableStart+12
-rst30vector	.EQU	vecTableStart+15
-rst38vector	.EQU	vecTableStart+18
-nmivector	.EQU	vecTableStart+21
+rst08vector	.EQU	vecTableStart		; Actual vector is at +1
+rst10vector	.EQU	vecTableStart+3		; Actual vector is at +4
+rst18vector	.EQU	vecTableStart+6		; Actual vector is at +7
+rst20vector	.EQU	vecTableStart+9		; Actual vector is at +10
+rst28vector	.EQU	vecTableStart+12	; Actual vector is at +13
+rst30vector	.EQU	vecTableStart+15	; Actual vector is at +16
+rst38vector	.EQU	vecTableStart+18	; Actual vector is at +19
+nmivector	.EQU	vecTableStart+21	; Actual vector is at +22
 vecTableLength	.EQU	24	; 8x3
 vecTableEnd	.EQU	$8020
 
@@ -42,23 +68,18 @@ vecTableEnd	.EQU	$8020
 ; Full input buffering with incoming data hardware handshaking
 ; Handshake shows full before the buffer is totally filled to allow run-on from the sender
 
-SER_BUFSIZE     .EQU     3FH
-SER_FULLSIZE    .EQU     30H
-SER_EMPTYSIZE   .EQU     5
+serInPtr        .EQU     vecTableEnd
+serRdPtr        .EQU     vecTableEnd+2
+serBufUsed      .EQU     vecTableEnd+4
+bootFlag        .EQU     vecTableEnd+6
+serErrCount     .EQU     vecTableEnd+8          ; Count number of serial overflow errors
+TEMPSTACK       .EQU     80FFH	; serBuf+$ED	; $80ED ; Top of BASIC line input buffer so is "free ram" when BASIC resets
 
-RTS_HIGH        .EQU     0D6H
-RTS_LOW         .EQU     096H
+serBuf          .EQU     8100H  ; vecTableEnd	; 8020H (was $8000)
 
-serBuf          .EQU     vecTableEnd	; $8000
-serInPtr        .EQU     serBuf+SER_BUFSIZE
-serRdPtr        .EQU     serInPtr+2
-serBufUsed      .EQU     serRdPtr+2
-basicStarted    .EQU     serBufUsed+1
-TEMPSTACK       .EQU     serBuf+$ED	; $80ED ; Top of BASIC line input buffer so is "free ram" when BASIC resets
-
-CR              .EQU     0DH
-LF              .EQU     0AH
-CS              .EQU     0CH             ; Clear screen
+monStart        .EQU    0150H
+;monCold         .EQU    0150H
+;monWarm         .EQU    0153H
 
                 .ORG $0000
 ;------------------------------------------------------------------------------
@@ -71,20 +92,23 @@ RST00           DI                       ;Disable interrupts
 ; TX a character over RS232 
 
                 .ORG     0008H
-RST08            JP      rst08vector	; TXA
+RST08:
+		JP      rst08vector	; TXA
 
 ;------------------------------------------------------------------------------
 ; RX a character over RS232 Channel A [Console], hold here until char ready.
 
                 .ORG 0010H
-RST10            JP      rst10vector	; RXA
+RST10:
+		JP      rst10vector	; RXA
 
 ;------------------------------------------------------------------------------
 ; Check serial status
 ; Check if serial receive buffer is empty
 
                 .ORG 0018H
-RST18            JP      rst18vector	; CKINCHAR
+RST18:
+		JP      rst18vector	; CKINCHAR
 
 ;------------------------------------------------------------------------------
 ; RST20
@@ -105,7 +129,9 @@ RST30            JP      rst30vector	;
 ; RST 38 - INTERRUPT VECTOR [ for IM 1 ]
 
                 .ORG     0038H
-RST38            JP      rst38vector	; serialInt       
+RST38:
+            	JP      rst38vector	; serialInt
+    
 
 ;------------------------------------------------------------------------------
 ; vector table prototype. to be copied to RAM on reset
@@ -121,49 +147,63 @@ vecTabProto	JP	TXA			; RST 08
 ;------------------------------------------------------------------------------
 
 SIGNON1:       .BYTE     CS
-		.BYTE	CR,LF,"RC2014",0
-;               .BYTE     "Z80 SBC By Grant Searle",CR,LF,0
-SIGNON2:       .BYTE     CR,LF
-		.BYTE	"C/W?",0
-;               .BYTE     "Cold or warm start (C or W)? ",0		
+		.BYTE	CR,LF,"Z80 BIOS",0
+		
 ;------------------------------------------------------------------------------
 ; NMI
                 .ORG 0066H
                 JP	nmivector
-				
+
 ;------------------------------------------------------------------------------
-serialInt:      PUSH     AF
+; Serial interrupt handler
+serialInt:      
+                PUSH     AF
                 PUSH     HL
 
                 IN       A,($80)
                 AND      $01             ; Check if interupt due to read buffer full
                 JR       Z,rts0          ; if not, ignore
 
-                IN       A,($81)
-                PUSH     AF
-                LD       A,(serBufUsed)
-                CP       SER_BUFSIZE     ; If full then ignore
+                IN       A,($81)        ; Get character from UART
+                PUSH     AF             ; Save it first
+                LD       A,(serBufUsed) ; Get # of bytes in buffer
+                CP       SER_BUFSIZE    ; If full then ignore
                 JR       NZ,notFull
                 POP      AF
+                ; Insert code to increment serial error count
+                LD       A, (serErrCount)
+                CP       0FFH
+                JR       Z, rts0           ; Just quit if we've maxed out # of errors
+                INC      A
+                LD       (serErrCount), A
                 JR       rts0
 
-notFull:        LD       HL,(serInPtr)
-                INC      HL
-                LD       A,L             ; Only need to check low byte becasuse buffer<256 bytes
-                CP       lo(serBuf+SER_BUFSIZE)	; bc & $FF
-                JR       NZ, notWrap
-                LD       HL,serBuf
-notWrap:        LD       (serInPtr),HL
-                POP      AF
-                LD       (HL),A
+notFull:
+                INC     A               ; Increase # of bytes in buffer
+                LD      (serBufUsed),A ; Save it
+                LD      A, (serInPtr)   ; Load LSB of pointer to A
+                INC     A               ; If this rolls over, it's okay
+                LD      L, A
+                LD      H, hi(serBuf)
+                ; Now HL points to next location in buffer
+;        LD       HL,(serInPtr)
+;                INC      HL
+;                LD       A,L             ; Only need to check low byte becasuse buffer<256 bytes
+;                CP       lo(serBuf+SER_BUFSIZE)	; bc & $FF
+;                JR       NZ, notWrap
+;                LD       HL,serBuf
+;notWrap:
+                LD       (serInPtr),HL  ; Save pointer
+                POP      AF             ; Get character
+                LD       (HL),A         ; Save it in buffer
                 LD       A,(serBufUsed)
-                INC      A
-                LD       (serBufUsed),A
+;                INC      A
                 CP       SER_FULLSIZE
-                JR       C,rts0
-                LD       A,RTS_HIGH
-                OUT      ($80),A
-rts0:           POP      HL
+                JR       C, rts0
+                LD       A, RTS_HIGH
+                OUT      ($80), A       ; Deassert RTS
+rts0:
+                POP      HL
                 POP      AF
                 EI
                 RETI
@@ -172,19 +212,27 @@ handle_nmi:
 
 ;------------------------------------------------------------------------------
 ; RST 10H
+; Get a character from buffer. 
+; Blocking call
 RXA:
-waitForChar:    LD       A,(serBufUsed)
-                CP       $00
+waitForChar:    LD       A, (serBufUsed)
+;                CP       $00
+                OR      A       ; test if zero
                 JR       Z, waitForChar
                 PUSH     HL
-                LD       HL,(serRdPtr)
-                INC      HL
-                LD       A,L             ; Only need to check low byte becasuse buffer<256 bytes
-                CP       lo(serBuf+SER_BUFSIZE)	; bc & $FF
-                JR       NZ, notRdWrap
-                LD       HL,serBuf
-notRdWrap:      DI
+                LD      A, (serRdPtr)
+                INC     A
+                LD      L, A
+                LD      H, hi(serBuf)
+;                LD       HL,(serRdPtr)
+;                INC      HL
+;                LD       A,L             ; Only need to check low byte becasuse buffer<256 bytes
+;                CP       lo(serBuf+SER_BUFSIZE)	; bc & $FF
+;                JR       NZ, notRdWrap
+;                LD       HL,serBuf
+;notRdWrap:
                 LD       (serRdPtr),HL
+                DI
                 LD       A,(serBufUsed)
                 DEC      A
                 LD       (serBufUsed),A
@@ -216,64 +264,36 @@ conout1:        IN       A,($80)         ; Status byte
 CKINCHAR        LD       A,(serBufUsed)
                 CP       A, $0
                 RET
-
-;------------------------------------------------------------------------------
-PRINT:          LD       A,(HL)          ; Get character
-                OR       A               ; Is it $00 ?
-                RET      Z               ; Then RETurn on terminator
-                RST      08H             ; Print it
-                INC      HL              ; Next Character
-                JR       PRINT           ; Continue until $00
-                RET
+          
 ;------------------------------------------------------------------------------
 INIT:
-               ; Set up vector table first
-               LD	HL, vecTabProto
-               LD	DE, vecTableStart
-               LD	BC, 24
-               LDIR		
+                ; Set up vector table first
+                LD	HL, vecTabProto
+                LD	DE, vecTableStart
+                LD	BC, 24
+                LDIR		
                
-               LD        HL,TEMPSTACK    ; Temp stack
-               LD        SP,HL           ; Set up a temporary stack
-               LD        HL,serBuf
-               LD        (serInPtr),HL
-               LD        (serRdPtr),HL
-               XOR       A               ;0 to accumulator
-               LD        (serBufUsed),A
-               LD        A,RTS_LOW
-               OUT       ($80),A         ; Initialise ACIA
-               IM        1
-               EI
-               LD        HL,SIGNON1      ; Sign-on message
-               CALL      PRINT           ; Output string
-               LD        A,(basicStarted); Check the BASIC STARTED flag
-               CP        'Y'             ; to see if this is power-up
-               JR        NZ,COLDSTART    ; If not BASIC started then always do cold start
-               LD        HL,SIGNON2      ; Cold/warm message
-               CALL      PRINT           ; Output string
-CORW:
-               CALL      RXA
-               AND       %11011111       ; lower to uppercase
-               CP        'C'
-               JR        NZ, CHECKWARM
-               RST       08H
-               LD        A,$0D
-               RST       08H
-               LD        A,$0A
-               RST       08H
-COLDSTART:     LD        A,'Y'           ; Set the BASIC STARTED flag
-               LD        (basicStarted),A
-               JP        $0150           ; Start BASIC COLD
-CHECKWARM:
-               CP        'W'
-               JR        NZ, CORW
-               RST       08H
-               LD        A,$0D
-               RST       08H
-               LD        A,$0A
-               RST       08H
-               JP        $0153           ; Start BASIC WARM
+                LD       HL, TEMPSTACK  ; Temp stack
+                LD       SP, HL         ; Set up a temporary stack
+                LD       HL, serBuf
+                LD       (serInPtr), HL
+                LD       (serRdPtr), HL
+                XOR      A              ;0 to accumulator
+                LD       (serBufUsed), A
+                LD       (serErrCount), A
+                ; Initialize UART
+                LD       A, RTS_LOW
+                OUT      ($80), A       ; Initialise ACIA
+                
+                ; Initialize Interrupt mode
+                IM       1
+                ; Enable Interrupt
+                EI
+                LD       HL, SIGNON1    ; Sign-on message
+                CALL     MON_PRINT      ; Output string
+                JP       0150H          ; Jump to monitor
+
               
 		.ORG 0150H
               
-.END
+;        .END

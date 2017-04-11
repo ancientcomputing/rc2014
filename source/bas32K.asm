@@ -5,6 +5,7 @@
 ; flexibility for developers
 ; 3. Shift original RAM use up 20h to leave space for the vector table
 ; 4. Use RST instead of hard jump for outputing character
+; 5. Start address at 1000h
 ; 
 ; All mods to original code are copyright Ben Chong and freely licensed to the community
 ;
@@ -47,7 +48,7 @@ DEL     .EQU    7FH             ; Delete
 
 ; BASIC WORK SPACE LOCATIONS
 
-WRKSPC  .EQU    8065H	; 8045H             ; BASIC Work space
+WRKSPC  .EQU    8200H   ;8065H	; 8045H             ; BASIC Work space
 USR     .EQU    WRKSPC+3H           ; "USR (x)" jump
 OUTSUB  .EQU    WRKSPC+6H           ; "OUT p,n"
 OTPORT  .EQU    WRKSPC+7H           ; Port (p)
@@ -136,7 +137,8 @@ MO      .EQU    24H             ; Missing operand
 HX      .EQU    26H             ; HEX error
 BN      .EQU    28H             ; BIN error
 
-        .ORG    00150H
+;        .ORG    00150H
+        .ORG    1000H           ; Start address in 16KB ROM alongside Monitor/Debugger
 
 COLD:   JP      STARTB          ; Jump for cold start
 WARM:   JP      WARMST          ; Jump for warm start
@@ -4348,6 +4350,9 @@ TSTBIT: PUSH    AF              ; Save bit mask
 
 OUTNCR: CALL    OUTC            ; Output character in A
         JP      PRNTCRLF        ; Output CRLF
+        
+        .ORG    03FFFH
+        DB      33H
 
 .end
 
