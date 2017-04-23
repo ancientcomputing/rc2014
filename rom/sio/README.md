@@ -7,6 +7,6 @@ siomon.rom has not been tested, please yell if it doesn't work.
 SIO card configuration:
 <br>
 - Address 20H
-- Serial port A
-- IE tied to Vcc
-- 1.8432MHz oscillator
+<br>- Serial port A
+<br>- IE tied to Vcc
+<br>- 1.8432MHz oscillator
