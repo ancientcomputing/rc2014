@@ -11,7 +11,7 @@ SIO card configuration:
 - Address 20H. To change, edit sio_base in the source file
 <br>- Serial port A
 <br>- IE tied to Vcc
-<br>- 1.8432MHz oscillator
+<br>- 1.8432MHz oscillator for a baudrate of 115200
 <p>
 Note that interrupts are enabled and used.
 <p>
