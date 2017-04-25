@@ -3,3 +3,5 @@
 Exposes SID/SOD to an FTDI header for UART-less serial.
 <p>
 UNTESTED
+<p>
+Copyright Ben Chong and licensed freely back to the community.

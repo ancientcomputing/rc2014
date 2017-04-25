@@ -14,3 +14,5 @@ Populate all JP1 for address starting at 8000H<br>
 Populate all JP2 for address starting at 9000H
 <p>
 Untested. 450ns RAM chips may not work with a 7MHz Z80 CPU.
+<p>
+Copyright Ben Chong and licensed freely back to the community.
