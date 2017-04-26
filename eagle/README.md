@@ -8,6 +8,8 @@ z80_board: this is an opinionated implementation of a CPU module for the RC2014.
 <p>
 The crystal oscillator can be connected to the RC2014 bus or not. The decoupling of the Z80's clock from the bus clock means that you are no longer bounded by the requirements of the UART baudrate. You will be able to run the Z80 at 20MHz (assuming you have the 20MHz part and that the bus doesn't impact the high frequency signals too much).
 <p>
-#IMPORTANT: These designs are at the prototype stage as of now. I have put in the initial board orders at OSH Park and have not tested any of the designs. If you do find errors, please flag them!
+#IMPORTANT: These designs unless described otherwise are at the prototype stage as of now. I have put in the initial board orders at OSH Park and have not tested any of the designs. If you do find errors, please flag them!
 <p>
 kicadis are encouraged to convert the files to kicad format with the sole requirement that the converted files are made freely available aka "open source"...
+<p>
+Copyright Ben Chong and freely licensed back to the community.
