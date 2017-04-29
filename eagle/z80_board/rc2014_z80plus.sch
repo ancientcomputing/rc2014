@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE eagle SYSTEM "eagle.dtd">
-<eagle version="8.1.0">
+<eagle version="8.1.1">
 <drawing>
 <settings>
 <setting alwaysvectorfont="no"/>
@@ -13627,11 +13627,11 @@ Based on the following sources:
 <part name="C5" library="rcl" deviceset="CPOL-US" device="TAP5-80" value="22uF"/>
 <part name="D1" library="diode" deviceset="1N4148" device="DO35-10"/>
 <part name="R1" library="rcl" deviceset="R-US_" device="0207/10" value="10K"/>
-<part name="R2" library="rcl" deviceset="R-US_" device="0207/10" value="10K"/>
+<part name="R2" library="rcl" deviceset="R-US_" device="0207/10" value="3.3K"/>
 <part name="GND1" library="supply1" deviceset="GND" device=""/>
 <part name="P+4" library="supply1" deviceset="VCC" device=""/>
 <part name="IC1" library="74xx-eu" deviceset="74*14" device="N" technology="HCT"/>
-<part name="R3" library="rcl" deviceset="R-US_" device="0207/10" value="10K"/>
+<part name="R3" library="rcl" deviceset="R-US_" device="0207/10" value="3.3K"/>
 <part name="P+5" library="supply1" deviceset="VCC" device=""/>
 <part name="GND5" library="supply1" deviceset="GND" device=""/>
 <part name="CLOCK" library="pinhead" deviceset="PINHD-1X2" device=""/>
