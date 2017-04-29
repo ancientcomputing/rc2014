@@ -22,5 +22,13 @@ Check out the documentation in the docs folder.
 <p>
 <hr>
 <p>
+<b>RC2014 Add-on Modules</b>
+<p>
+The eagle folder contain a number of designs for add-on boards for the RC2014. The designs are in the form of Eagle files which can be used to order PCBs from manufacturers that can take .brd files. Or you can download the free version of Eagle and generate the necessary gerber files for your PCB vendor of choice.
+<p>
+Do also watch out for the OSH Park logos. Those are links to projects that I have shared on OSH Park, and you can order the boards directly from them. And no, I don't have any commission etc.
+<p>
+<hr>
+<p>
 Blog: http://ancientcomputing.blogspot.com
 
