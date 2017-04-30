@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE eagle SYSTEM "eagle.dtd">
-<eagle version="8.1.0">
+<eagle version="8.1.1">
 <drawing>
 <settings>
 <setting alwaysvectorfont="no"/>
@@ -14895,8 +14895,8 @@ Source: 008-0260-0_E.pdf</description>
 <part name="FTDIGND" library="pinhead" deviceset="PINHD-1X6" device=""/>
 <part name="C2" library="rcl" deviceset="C-EU" device="050-024X044" value="0.1uF"/>
 <part name="R2" library="rcl" deviceset="R-US_" device="0207/10" value="10K"/>
-<part name="R3" library="rcl" deviceset="R-US_" device="0207/10" value="10K"/>
-<part name="R4" library="rcl" deviceset="R-US_" device="0207/10" value="10K"/>
+<part name="R3" library="rcl" deviceset="R-US_" device="0207/10" value="1K"/>
+<part name="R4" library="rcl" deviceset="R-US_" device="0207/10" value="1K"/>
 </parts>
 <sheets>
 <sheet>
@@ -15205,7 +15205,7 @@ Source: 008-0260-0_E.pdf</description>
 <segment>
 <pinref part="_PIN1" gate="-1" pin="14"/>
 <wire x1="-104.14" y1="149.86" x2="-35.56" y2="149.86" width="0.1524" layer="91"/>
-<wire x1="-35.56" y1="119.38" x2="-35.56" y2="149.86" width="0.1524" layer="91"/>
+<wire x1="-35.56" y1="116.84" x2="-35.56" y2="149.86" width="0.1524" layer="91"/>
 </segment>
 <segment>
 <pinref part="IC3" gate="A" pin="6Q"/>
@@ -15458,6 +15458,10 @@ Source: 008-0260-0_E.pdf</description>
 <wire x1="-104.14" y1="132.08" x2="-17.78" y2="132.08" width="0.1524" layer="91"/>
 <label x="-17.78" y="132.08" size="1.778" layer="95"/>
 </segment>
+<segment>
+<pinref part="IC2" gate="G$1" pin="CLK"/>
+<wire x1="17.78" y1="142.24" x2="15.24" y2="142.24" width="0.1524" layer="91"/>
+</segment>
 </net>
 <net name="/MREQ" class="0">
 <segment>
@@ -15518,7 +15522,7 @@ Source: 008-0260-0_E.pdf</description>
 <label x="10.16" y="121.92" size="1.778" layer="95"/>
 </segment>
 </net>
-<net name="N$2" class="0">
+<net name="ALE" class="0">
 <segment>
 <pinref part="IC3" gate="A" pin="C"/>
 <wire x1="-12.7" y1="78.74" x2="5.08" y2="78.74" width="0.1524" layer="91"/>
@@ -15577,14 +15581,14 @@ Source: 008-0260-0_E.pdf</description>
 <label x="45.72" y="190.5" size="1.778" layer="95"/>
 </segment>
 </net>
-<net name="N$3" class="0">
+<net name="TX" class="0">
 <segment>
 <pinref part="R4" gate="G$1" pin="1"/>
 <pinref part="FTDIGND" gate="A" pin="5"/>
 <wire x1="81.28" y1="114.3" x2="96.52" y2="114.3" width="0.1524" layer="91"/>
 </segment>
 </net>
-<net name="N$4" class="0">
+<net name="RX" class="0">
 <segment>
 <pinref part="R3" gate="G$1" pin="1"/>
 <wire x1="81.28" y1="119.38" x2="86.36" y2="119.38" width="0.1524" layer="91"/>
@@ -15596,6 +15600,9 @@ Source: 008-0260-0_E.pdf</description>
 </nets>
 </sheet>
 </sheets>
+<errors>
+<approved hash="101,1,25.4,220.98,IC1F,O,,,,"/>
+</errors>
 </schematic>
 </drawing>
 </eagle>
