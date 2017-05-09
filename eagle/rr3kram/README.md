@@ -13,7 +13,7 @@ Jumpers:<br>
 Populate all JP1 for address starting at 8000H<br>
 Populate all JP2 for address starting at 9000H
 <p>
-200ns RAM chips work with a Z80 CPU running at 14MHz. 450ns RAM chips may not work with a 7MHz Z80 CPU.
+(TESTED) 200ns RAM chips work with a Z80 CPU running at 14MHz. 450ns RAM chips may not work with a 7MHz Z80 CPU.
 <p>
 This version fixes the missing A0 and A1 lines in the original release.
 <p>
