@@ -18,6 +18,12 @@ This Z80 board is compatible with other RC2014 modules. If you plan to use this 
 <p>
 8085_board: Use another CPU with the RC2014! The 8085 is the step-sibling of the Z80. This implementation exposes the SID/SOD lines to an FTDI header so that you can run with a serial terminal without the use of a UART card. A 6.144MHz crystal is recommended for compatibility with the Tiny Basic found <a href="https://github.com/ancientcomputing/8080_8085/tree/master/Tiny_Basic">here</a>.
 <p>
+Real Retro 3KB RAM board aka rr3kram (TESTED): Remember when 3KB was a lot of memory? The Real Retro 3KB RAM board tries to relive that experience. It uses 3 pairs of 2114 RAM chips to deliver a massive 3KB of memory.
+<p>
+With 200ns devices, it will even work with the Z80 CPU+ board equiped with a blistering fast 14MHz Z80.
+<p>
+The original board design had disconnected A0, A1 lines which have now been fixed.   
+<p>
 <hr>
 <p>
 <b>IMPORTANT</b>: These designs unless described otherwise are at the prototype stage as of now. I have put in the initial board orders at OSH Park and have not tested any of the designs. If you do find errors, please flag them!
