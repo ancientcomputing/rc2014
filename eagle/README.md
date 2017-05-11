@@ -2,9 +2,13 @@
 <p>
 16550 board (TESTED): Simple board for 16550, 16C550 and similar UART devices. Can be used with 1.8432MHz or 7.3728MHz oscillators. Note that pin 1 (GND) of the FTDI connector is on the left (looking at the board with the bus connector at the bottom).
 <p>
-The port address starts at 80H. A new BIOS will be made available for this.
+The port address starts at 80H. A new BIOS is available. See source/16x550. Binaries are at rom/16x550.
 <p>
 There is no option to power the system from the FTDI header.
+<p>
+16550 board Rev B (TESTED): A variant of the 16550 board implementation. Using 74HCT03 open collector gates, particularly to drive the /INT line. This means that other peripherals can also drive the /INT line. 
+<p>
+The port address starts at C0H. A new BIOS will be made available for this. For the impatient, just change the uart_base value to 0c0h from 80h.
 <p>
 z80_board (TESTED): This is an opinionated implementation of a CPU module for the RC2014. It is designed for the v1.0 bus but may work for the Pro/v2 bus. The opinionated parts of the design is a bona fide reset circuit (the firmware should start up on power up), and the use of a crystal oscillator.
 <p>
