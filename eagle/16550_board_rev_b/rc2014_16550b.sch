@@ -7140,10 +7140,10 @@ Based on the following sources:
 <part name="GND3" library="supply1" deviceset="GND" device=""/>
 <part name="GND4" library="supply1" deviceset="GND" device=""/>
 <part name="C4" library="rcl" deviceset="C-EU" device="050-024X044" value="0.1uF"/>
-<part name="IC2" library="74xx-eu" deviceset="74*00" device="N" technology="HCT"/>
-<part name="R1" library="rcl" deviceset="R-US_" device="0207/10"/>
-<part name="R2" library="rcl" deviceset="R-US_" device="0207/10"/>
-<part name="R3" library="rcl" deviceset="R-US_" device="0207/10"/>
+<part name="IC2" library="74xx-eu" deviceset="74*00" device="N" technology="HCT" value="74HCT03N"/>
+<part name="R1" library="rcl" deviceset="R-US_" device="0207/10" value="4.7K"/>
+<part name="R2" library="rcl" deviceset="R-US_" device="0207/10" value="4.7K"/>
+<part name="R3" library="rcl" deviceset="R-US_" device="0207/10" value="4.7K"/>
 <part name="P+4" library="supply1" deviceset="VCC" device=""/>
 <part name="JP1" library="pinhead" deviceset="PINHD-1X3" device=""/>
 </parts>
