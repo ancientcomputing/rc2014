@@ -14893,7 +14893,7 @@ Source: 008-0260-0_E.pdf</description>
 <part name="IC3" library="74xx-eu" deviceset="74*573" device="N" technology="HCT"/>
 <part name="Q1" library="crystal" deviceset="CRYSTAL" device="HC49S"/>
 <part name="FTDIGND" library="pinhead" deviceset="PINHD-1X6" device=""/>
-<part name="C2" library="rcl" deviceset="C-EU" device="050-024X044" value="0.1uF"/>
+<part name="C2" library="rcl" deviceset="C-EU" device="050-024X044" value="20pF (&lt;4MHz)"/>
 <part name="R2" library="rcl" deviceset="R-US_" device="0207/10" value="10K"/>
 <part name="R3" library="rcl" deviceset="R-US_" device="0207/10" value="1K"/>
 <part name="R4" library="rcl" deviceset="R-US_" device="0207/10" value="1K"/>
@@ -15461,6 +15461,7 @@ Source: 008-0260-0_E.pdf</description>
 <segment>
 <pinref part="IC2" gate="G$1" pin="CLK"/>
 <wire x1="17.78" y1="142.24" x2="15.24" y2="142.24" width="0.1524" layer="91"/>
+<label x="10.16" y="142.24" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="/MREQ" class="0">
