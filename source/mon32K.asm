@@ -1,4 +1,5 @@
 ; Monitor/Debugger for Spencer Owen's Z80-based RC2014 (http://rc2014.co.uk)
+; Supports 8085 CPU Board for the RC2014
 ; Source hosted at: https://github.com/ancientcomputing/rc2014
 ;
 ; Changes:
@@ -25,7 +26,7 @@
 ; 15. We now save the interrupt enable state (IFF2) during breakpoint handling
 ; 16. Use 8030H onwards. Part of effort to use a 255 size serial receive buffer
 ; 17. Assemble-time option for 8080
-; 
+; 18. input/output commands for 8080
 ;
 ; -----------------------------------------------------------------------------
 ;
@@ -61,7 +62,7 @@
 ;
 ;
 
-#define CPU8080 1
+#define CPU8080 0
 
 ;------------------------------------------------------------------------------
 ;	Memory Map
@@ -129,6 +130,9 @@ ECHO_ON		equ	MON_RAM+30	; Echo characters
 ;XMTYPE		equ	MON_RAM+34	; XMODEM BLOCK TYPE (CRC/CS)
 DISZ80_PTR      equ     MON_RAM+36      ; Pointer to code for disassembler
 IFF_STATE       equ     MON_RAM+38      ; State of IFF at breakpoint
+CPU8080IO       equ     MON_RAM+40      ; In-RAM code to handle I/O 
+CPU8080IN       equ     MON_RAM+41      ; Where we put the input port value
+CPU8080OUT      equ     MON_RAM+44      ; Where we put the output port value
 
 ;String equates
 CR		equ	0x0D
@@ -251,7 +255,7 @@ MM_CC:
 		JP 	Z, GO_EXEC	; G = Go (Execute at)
 		CP 	'H'
 		JP 	Z, SET_BUFFER	; H = Set buffer start address for Intel HEX upload
-#if CPU8080
+#if 0   ;CPU8080
                 ; No port operations
 #else
 		CP 	'O'
@@ -290,12 +294,9 @@ VERSION:
 		DB	CR,LF,"E XXXX         Edit memory from XXXX; CR to skip"
 		DB	CR,LF,"G XXXX         Go execute from XXXX"
 		DB	CR,LF,"H XXXX         Set HEX file start address to XXXX"
-#if CPU8080
                 ; No I/O commands
-#else
 		DB	CR,LF,"I XX           Input from port XX"
 		DB	CR,LF,"O XX YY        Output YY to port XX"
-#endif
 #if CPU8080
                 ; No Breakpoint commands
 #else
@@ -477,32 +478,55 @@ GE_0:
 
 ;------------------------------------------------------------------------------
 ; Input from port, print contents
-#if CPU8080
                 ; No input command
-#else
 PORT_INP:	
 		CALL	SPACE_GET_BYTE	; Port address
 		LD	C, A
+#if CPU8080
+                LD      HL, CPU8080IO
+                LD      A, 0DBH
+                LD      (HL), A
+                INC     L
+                LD      A, C            ; PORT value is in C
+                LD      (HL), A
+                INC     L
+                LD      A, 0C9H
+                LD      (HL), A
+                CALL      CPU8080IO     
+#else
 		IN	A,(C)		; Read from port
+#endif
 		CALL	SPACE_PRINT_BYTE
 		JP	MAIN_MENU
-#endif
 ;------------------------------------------------------------------------------
 ; Get a port address, write byte out
 ; Give the user a way to abort and avoid writing to a port
 
-#if CPU8080
-                ; No output command
-#else
 PORT_OUT:	
 		CALL	SPACE_GET_BYTE	; Port address
 		LD	C, A
 		CALL	SPACE_GET_BYTE	; Data to write to port
+#if CPU8080
+		JP      C, PO_0         ; Abort if any other keypressed
+
+                PUSH    AF
+                LD      HL, CPU8080IO+3
+                LD      A, 0D3H
+                LD      (HL), A
+                INC     L
+                LD      A, C            ; PORT value is in C
+                LD      (HL), A
+                INC     L
+                LD      A, 0C9H
+                LD      (HL), A
+                POP     AF
+                CALL      CPU8080IO+3
+#else
 		JR      C, PO_0         ; Abort if any other keypressed
 		OUT	(C),A
+#endif
 PO_0:
 		JP	MAIN_MENU
-#endif
 
 #if CPU8080
                 ; Don't do breakpoints here

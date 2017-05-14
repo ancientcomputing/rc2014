@@ -19,3 +19,5 @@ Hardware requirements:
 <br>- RC2014 Switcheable ROM Board
 <p>
 Note that the RC2014 Pageable ROM board does not work because of the paging circuitry. To get the Pageable ROM board to work, you will need to remove the 74HCT138 and 74HC393 chips, then solder a link from pin 3 of the 74HC393 chip to ground.
+<p>
+NEW: Added support to read from an input port or write to an output port.
