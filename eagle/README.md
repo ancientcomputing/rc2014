@@ -16,7 +16,9 @@ The crystal oscillator can be connected to the RC2014 bus or not. The decoupling
 <p>
 This Z80 board is compatible with other RC2014 modules. If you plan to use this with the 68B50 ACIA module, you will have to use a 7.3728MHz oscillator and short the CLOCK jumper.
 <p>
-<b>8085_board</b> (TESTED): Use another CPU with the RC2014! The 8085 is the step-sibling of the Z80. This implementation exposes the SID/SOD lines to an FTDI header so that you can run with a serial terminal without the use of a UART card. A 6.144MHz crystal is recommended for compatibility with the Tiny Basic found <a href="https://github.com/ancientcomputing/8080_8085/tree/master/Tiny_Basic">here</a>.
+<b>8085_board (TESTED)</b>: Use another CPU with the RC2014! The 8085 is the step-sibling of the Z80. This implementation exposes the SID/SOD lines to an FTDI header so that you can run with a serial terminal without the use of a UART card. A 6.144MHz crystal is recommended for compatibility with the Tiny Basic found <a href="https://github.com/ancientcomputing/8080_8085/tree/master/Tiny_Basic">here</a>.
+<p>
+A Monitor can also be found in the <a href="https://github.com/ancientcomputing/rc2014/tree/master/rom/8085rom/">8085 folder</a>.
 <p>
 <b>Real Retro 3KB RAM board aka rr3kram (TESTED)</b>: Remember when 3KB was a lot of memory? The Real Retro 3KB RAM board tries to relive that experience. It uses 3 pairs of 2114 RAM chips to deliver a massive 3KB of memory.
 <p>

@@ -18,4 +18,4 @@ Hardware requirements:
 <br>- 16550 UART Board (both original and RevB versions)
 <br>- RC2014 Switcheable ROM Board
 <p>
-Note that the RC2014 Pageable ROM board does not work because of the paging circuitry. To get the Pageable ROM board to work, you will need to remove the 74HCT138 and 74LS393 chips, then solder a link from pin 3 of the 74LS393 chip to ground.
+Note that the RC2014 Pageable ROM board does not work because of the paging circuitry. To get the Pageable ROM board to work, you will need to remove the 74HCT138 and 74HC393 chips, then solder a link from pin 3 of the 74HC393 chip to ground.
