@@ -14,6 +14,8 @@
 ; use polling.
 ; 9. Working interrupts
 ; 10. Tested on 16550 board for RC2014
+; 11. Assemble-time option for 8080
+; 12. Assemble-time option for polled mode UART
 ; 
 ; All mods to original code are copyright Ben Chong and freely licensed to the community
 ; This version is developed for the RC2014 16550 board.
@@ -34,11 +36,19 @@
 ;
 ;==================================================================================
 
+#define CPU8080 0
+
+#if CPU8080
+#define POLLED 1
+#else
+#define POLLED 0
+#endif
+
 ;
 ; 16C550 registers:
 ;
 
-uart_base       .EQU     0c0H	;80H
+uart_base       .EQU     0C0H
 uart_register_0 .EQU     uart_base + 0
 uart_register_1 .EQU     uart_base + 1
 uart_register_2 .EQU     uart_base + 2
@@ -109,14 +119,22 @@ RST00           DI                       ;Disable interrupts
 
                 .ORG     0008H
 RST08:
-		JP      rst08vector	; TXA
+#if CPU8080
+		JP      TXA
+#else
+		JP      rst08vector
+#endif
 
 ;------------------------------------------------------------------------------
 ; RX a character over RS232 Channel A [Console], hold here until char ready.
 
                 .ORG 0010H
 RST10:
-		JP      rst10vector	; RXA
+#if CPU8080
+                JP      RXA
+#else
+		JP      rst10vector
+#endif
 
 ;------------------------------------------------------------------------------
 ; Check serial status
@@ -124,7 +142,11 @@ RST10:
 
                 .ORG 0018H
 RST18:
-		JP      rst18vector	; CKINCHAR
+#if CPU8080
+                JP      CKINCHAR
+#else
+		JP      rst18vector
+#endif
 
 ;------------------------------------------------------------------------------
 ; RST20
@@ -146,8 +168,11 @@ RST30            JP      rst30vector	;
 
                 .ORG     0038H
 RST38:
-            	JP      rst38vector	; serialInt
-    
+#if CPU8080
+            	JP      serialInt
+#else
+            	JP      rst38vector
+#endif
 
 ;------------------------------------------------------------------------------
 ; vector table prototype. to be copied to RAM on reset
@@ -162,8 +187,13 @@ vecTabProto	JP	TXA			; RST 08
 
 ;------------------------------------------------------------------------------
 
-SIGNON1:       .BYTE     CS
+SIGNON1:
+                .BYTE     CS
+#if CPU8080
+		.BYTE	CR,LF,"8080 BIOS",0
+#else
 		.BYTE	CR,LF,"Z80 BIOS",0
+#endif
 		
 ;------------------------------------------------------------------------------
 ; NMI
@@ -179,24 +209,43 @@ recheck_data:
                 ; Check if data available
                 ; We're not enabling any other interupt
                 IN      A, (uart_register_5)
+#if CPU8080
+                AND      A, 1
+#else
                 BIT     0, A
+#endif
 
+#if CPU8080
+                JP      Z, rts0
+#else
                 JR       Z,rts0          ; if not, ignore
-
+#endif
                 ; Read character from UART
                 in      a, (uart_register_0)    ; Read character from UART
                 PUSH     AF             ; Save it first
                 LD       A,(serBufUsed) ; Get # of bytes in buffer
                 CP       SER_BUFSIZE    ; If full then ignore
+#if CPU8080
+                JP       NZ,notFull
+#else
                 JR       NZ,notFull
+#endif
                 POP      AF
                 ; Insert code to increment serial error count
                 LD       A, (serErrCount)
                 CP       0FFH
+#if CPU8080
+                JP       Z, rts0           ; Just quit if we've maxed out # of errors
+#else
                 JR       Z, rts0           ; Just quit if we've maxed out # of errors
+#endif
                 INC      A
                 LD       (serErrCount), A
+#if CPU8080
+                JP      rts0
+#else
                 JR       rts0
+#endif
 
 notFull:
                 INC     A               ; Increase # of bytes in buffer
@@ -212,7 +261,11 @@ notFull:
                 LD       (HL),A         ; Save it in buffer
                 LD       A,(serBufUsed)
                 CP       SER_FULLSIZE
+#if CPU8080
+                jp      c, recheck_data ; See if anymore data in buffer
+#else
                 jr      c, recheck_data ; See if anymore data in buffer
+#endif
                 ; High water mark
                 call    deassert_rts_16C550
 
@@ -220,26 +273,46 @@ rts0:
                 POP      HL
                 POP      AF
                 EI
+#if CPU8080
+                RET
+#else
                 RETI
+#endif
 handle_nmi:
+#if CPU8080
+                RET
+#else
 		RETN
+#endif
 
 ;------------------------------------------------------------------------------
 ; RST 10H
 ; Get a character from buffer. 
 ; Blocking call
 RXA:
-#if 0 
+#if POLLED
 RX_LOOP:
                 IN      A, (uart_register_5)
+#if CPU8080
+                AND      A, 1
+#else
                 BIT     0, A
+#endif
+#if CPU8080
+                JP      Z, RX_LOOP         ; Wait until there is a character
+#else
                 JR      Z, RX_LOOP         ; Wait until there is a character
+#endif
                 IN      A, (uart_register_0)
                 RET
 #else
 waitForChar:    LD       A, (serBufUsed)
                 OR      A       ; test if zero
+#if CPU8080
+                JP       Z, waitForChar
+#else
                 JR       Z, waitForChar
+#endif
                 PUSH     HL
                 LD      A, (serRdPtr)
                 INC     A
@@ -252,7 +325,11 @@ waitForChar:    LD       A, (serBufUsed)
                 DEC      A
                 LD       (serBufUsed),A
                 CP       SER_EMPTYSIZE
+#if CPU8080
+                JP       NC,rts1
+#else
                 JR       NC,rts1
+#endif
                 ; Reset RTS
                 call    assert_rts_16C550
 rts1:
@@ -270,8 +347,16 @@ TXA:
                 PUSH    AF              ; Store character
 CONOUT1:
                 IN      A, (uart_register_5)    ; Line status register
+#if CPU8080
+                AND      A, 20H
+#else
                 BIT     5, A            ; Set Zero flag if still transmitting character
+#endif
+#if CPU8080
+                JP      Z, CONOUT1      ; Loop until flag signals ready
+#else
                 JR      Z, CONOUT1      ; Loop until flag signals ready        
+#endif
                 POP     AF              ; Retrieve character
                 OUT     (uart_register_0), A    ; Output the character
                 RET
@@ -280,13 +365,17 @@ CONOUT1:
 ; Check if a character is available
 ; Z=1 if buffer is empty
 CKINCHAR:
-#if 0 
+#if POLLED
                 IN      A, (uart_register_5)
+#if CPU8080
+                AND      A, 1
+#else
                 BIT     0, A
+#endif
                 RET
 #else
                 LD       A,(serBufUsed)
-                CP       A, $0
+                CP       A, 00H
                 RET
 #endif
           
@@ -296,8 +385,11 @@ INIT:
                 LD	HL, vecTabProto
                 LD	DE, vecTableStart
                 LD	BC, 24
+#if CPU8080
+                ; Don't use a redirect vector table for 8080
+#else
                 LDIR		
-               
+#endif    
                 LD       HL, TEMPSTACK  ; Temp stack
                 LD       SP, HL         ; Set up a temporary stack
                 LD       HL, serBuf
@@ -310,7 +402,10 @@ INIT:
                 call    INIT_16C550
                 
                 ; Initialize Interrupt mode
+#if CPU8080
+#else
                 IM       1
+#endif
                 ; Enable Interrupt
                 EI
                 LD       HL, SIGNON1    ; Sign-on message
@@ -335,8 +430,12 @@ SETBAUD_16C550:
                 OUT     (uart_register_4), A    ; Enable RTS
                 LD      A, 87H                  ; FIFO enable, reset RCVR/XMIT FIFO
                 OUT     (uart_register_2), A
+#if POLLED
+                ; Don't enable interrupts...
+#else
                 ld      a, 01h                  ; Enable receiver interrupt
                 out     (uart_register_1), a
+#endif
                 RET
  
 ;------------------------------------------------------------------------------
@@ -357,6 +456,7 @@ assert_rts_16C550:
 
 ;------------------------------------------------------------------------------
 ; Enable autoflow control
+
 AFE_16C550:
                 LD      A, 87H                  ; Trigger level, FIFO enable, reset FIFO
                 OUT     (uart_register_2), A
@@ -364,7 +464,8 @@ AFE_16C550:
                 LD      A, 22H                  ; Modem control register
                 OUT     (uart_register_4), A    ; Enable AFE
                 RET
-              
+
+
 		.ORG 0150H
               
 ;        .END

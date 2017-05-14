@@ -24,6 +24,7 @@
 ;       https://github.com/ancientcomputing/rc2014/tree/master/docs
 ; 15. We now save the interrupt enable state (IFF2) during breakpoint handling
 ; 16. Use 8030H onwards. Part of effort to use a 255 size serial receive buffer
+; 17. Assemble-time option for 8080
 ; 
 ;
 ; -----------------------------------------------------------------------------
@@ -59,6 +60,9 @@
 ; Revision history of the original firmware in the original source code.
 ;
 ;
+
+#define CPU8080 1
+
 ;------------------------------------------------------------------------------
 ;	Memory Map
 ;------------------------------------------------------------------------------
@@ -147,8 +151,6 @@ ESC		equ	27
 
                 JP      MON_ENTRY
                 JP      MON_WARM    
-;COLD:   	JP      MON_COLD	; STARTB          ; Jump for cold start
-;WARM:   	JP      MON_WARM	; WARMST          ; Jump for warm start
 
 ;------------------------------------------------------------------------------
 ; Jump tables for use by the BIOS
@@ -162,16 +164,24 @@ SIGNON2:        .BYTE   CR,LF
 		.BYTE	"C/W?",0
 		
 MON_ENTRY:
-                LD       A,(bootFlag)   ; Check if we had previously booted
-                CP       'Y'             ; to see if this is power-up
-                JR       NZ,COLDSTART    ; If not BASIC started then always do cold start
+                LD      A,(bootFlag)   ; Check if we had previously booted
+                CP      'Y'             ; to see if this is power-up
+#if CPU8080
+                JP      NZ, COLDSTART
+#else
+                JR      NZ,COLDSTART    ; If not BASIC started then always do cold start
+#endif
                 LD       HL,SIGNON2      ; Cold/warm message
                 CALL     PRINT           ; Output string
 CORW:
                 RST     10H
                 AND      %11011111       ; lower to uppercase
                 CP       'C'
+#if CPU8080
+                JP      NZ, CHECKWARM
+#else
                 JR       NZ, CHECKWARM
+#endif
 	        CALL	PRINT_NEW_LINE
 COLDSTART:     
                 LD       A,'Y'           ; Set the BASIC STARTED flag
@@ -179,7 +189,11 @@ COLDSTART:
                 JP       MON_COLD        ; monitor COLD
 CHECKWARM:
                 CP       'W'
+#if CPU8080
+                JP      NZ, CORW
+#else
                 JR       NZ, CORW
+#endif
                 RST      08H
                 CALL     PRINT_NEW_LINE
                 JP       MON_WARM
@@ -194,8 +208,12 @@ MON_COLD:
 		LD	(BRKPOINT), HL		; Clear breakpoint flag
 		LD      (IFF_STATE), HL         ; Clear interrupt enable state
 		; Set vector table for breakpoint handling
+#if CPU8080
+                ; No breakpoint
+#else
 		LD	HL, HANDLE_BRKPOINT
 		LD	(rst30vector+1), HL
+#endif
 
 MON_WARM:		
 MAIN_MENU:	
@@ -212,29 +230,48 @@ MM_CC:
 		CP	':'
 		JP 	Z, GETHEXFILE	; : = START HEX FILE LOAD
 		CP 	'?'		; We'll print help only if explicitly asked
+#if CPU8080
+		JP	Z, DO_HELP
+#else
 		JR	Z, DO_HELP
-
+#endif
 		; Handle Alpha commands here
 		AND 	0x5F		; Convert to upper case
 		CP 	'D'		; Branch to Command entered
 		JP 	Z, MEM_DUMP	; D = Memory Dump
+#if CPU8080
+                ; No Disassembler
+#else
 		CP 	'A'		; Branch to Command entered
 		JP 	Z, DISASSEMBLE	; A = Call DISZ80
+#endif
 		CP 	'E'
 		JP 	Z, MEM_EDIT	; E = Edit Memory
 		CP 	'G'
 		JP 	Z, GO_EXEC	; G = Go (Execute at)
 		CP 	'H'
 		JP 	Z, SET_BUFFER	; H = Set buffer start address for Intel HEX upload
+#if CPU8080
+                ; No port operations
+#else
 		CP 	'O'
 		JP Z, 	PORT_OUT	; O = Output to port
 		CP 	'I'
 		JP Z, 	PORT_INP	; I = Input from Port
+#endif
+#if CPU8080
+                ; No breakpoint operations
+#else
 		CP	'R'
 		JP	Z, DISPLAY_REG
 		CP	'C'
 		JP	Z, CONTINUE_BRKPOINT
+#endif
+#if CPU8080
+                JP      MAIN_MENU
+#else
 		JR	MAIN_MENU
+#endif
 
 ;------------------------------------------------------------------------------
 ; Print out help
@@ -243,15 +280,27 @@ DO_HELP:
 VERSION:
 		DB	CR,LF,"Monitor/Debugger v0.7.1"
 		DB	CR,LF,"?              Print this help"
+#if CPU8080
+                ; Not valid commands
+#else
 		DB      CR,LF,"A XXXX         Disassemble from XXXX"
 		DB	CR,LF,"C              Continue from Breakpoint"
+#endif
 		DB	CR,LF,"D XXXX         Dump memory from XXXX"
 		DB	CR,LF,"E XXXX         Edit memory from XXXX; CR to skip"
 		DB	CR,LF,"G XXXX         Go execute from XXXX"
 		DB	CR,LF,"H XXXX         Set HEX file start address to XXXX"
+#if CPU8080
+                ; No I/O commands
+#else
 		DB	CR,LF,"I XX           Input from port XX"
 		DB	CR,LF,"O XX YY        Output YY to port XX"
+#endif
+#if CPU8080
+                ; No Breakpoint commands
+#else
 		DB	CR,LF,"R              Display registers from Breakpoint"
+#endif
 		DB	CR,LF,":sHLtD...C     Load Intel HEX file, ':' is part of file"
 		DB	CR,LF,EOS
 		JP 	MAIN_MENU
@@ -263,20 +312,32 @@ MEM_DUMP:
 		; out:	c=1	A = non-hex char input	DE = Word
 		; out:	c=0	A = non-hex char input (No Word in DE)
 		CALL	SPACE_GET_WORD	;Input start address
+#if CPU8080
+		JP	NC, MD_END	; If no carry, no word in DE
+#else
 		JR	NC, MD_END	; If no carry, no word in DE
+#endif
 		LD	HL, DE
 MEM_DUMP_0:
 		LD	B,16		; 16 lines of 16 bytes = dump 256 bytes
 MEM_DUMP_LP:
 		CALL	PRINT_NEW_LINE
 		CALL	DUMP_LINE	;Dump 16 byte lines (advances HL)
+#if CPU8080
+                DEC     B
+                JP      NZ, MEM_DUMP_LP                
+#else
 		DJNZ	MEM_DUMP_LP	; Loop if not done with 16 lines
-
+#endif
 		CALL	PRINTI
 		DB	CR,LF,"Press any key to continue, ESC to abort",EOS
 		CALL	GET_CHAR_NE
 		CP	27
+#if CPU8080
+		JP	NZ, MEM_DUMP_0	; Dump next 256 bytes	;LP
+#else
 		JR	NZ, MEM_DUMP_0	; Dump next 256 bytes	;LP
+#endif
 		; Otherwise, end
 MD_END:
 		JP	MAIN_MENU
@@ -301,8 +362,12 @@ DL_P1L:		; Start of print byte loop
 		LD	A,(HL)		; Read byte
 		CALL	SPACE_PRINT_BYTE
 		INC	HL		; Next
+#if CPU8080
+                DEC     B
+                JP      NZ, DL_P1L
+#else
 		DJNZ	DL_P1L		; Loop next byte
-;DL_P2:
+#endif
 		CALL	PRINTI		;Print Seperator between part 1 and part 2
 		DB	" ; ", EOS
 
@@ -315,16 +380,29 @@ DL_PSL2:
 DL_P2L:		; Start of print ASCII loop
 		LD	A, (HL)
 		CP	' '		;A - 20h	Test for Valid ASCII characters
+#if CPU8080
+		JP	NC, DL_P2K1
+#else
 		JR	NC, DL_P2K1
+#endif
 		LD	A, '.'				;Replace with . if not ASCII
 DL_P2K1:
 		CP	7FH		;A - 07Fh
+#if CPU8080
+		JP	C, DL_P2K2
+#else		
 		JR	C, DL_P2K2
+#endif
 		LD	A, '.'
 DL_P2K2:
 		CALL	PUT_CHARBC
 		INC	HL
+#if CPU8080
+                DEC     B
+                JP      NZ, DL_P2L
+#else
 		DJNZ	DL_P2L		; Loop
+#endif
 		POP	BC		; Restore B
 		RET			; HL points to next char
 
@@ -346,10 +424,18 @@ ME_LP:
 		; A = Byte (if CY=0)  (last 2 hex characters)  Exit if Space Entered
 		; A = non-hex char input (if CY=1)
 		CALL	SPACE_GET_BYTE	; Input new value or Exit if invalid
+#if CPU8080
+		JP	NC, ME_LP0	; Valid byte
+#else
 		JR	NC, ME_LP0	; Valid byte
+#endif
 		; Not valid hex character
 		CP      A, CR          ; Did we hit a RETURN?
+#if CPU8080
+		JP      Z, ME_LP1       ; Yes, skip saving anything and inc hl
+#else
 		JR      Z, ME_LP1       ; Yes, skip saving anything and inc hl
+#endif
 		JP	MAIN_MENU	; Invalid byte, C=1 -> exit
 ME_LP0:
 		LD	(HL), A		; Save new value
@@ -357,7 +443,11 @@ ME_LP0:
 		CALL	SPACE_PRINT_BYTE
 ME_LP1:
 		INC	HL		;Advance to next location
+#if CPU8080
+                JP      ME_LP
+#else
 		JR	ME_LP		;repeat input
+#endif
 
 ;------------------------------------------------------------------------------
 ; GO_EXEC - Execute program at XXXX
@@ -368,7 +458,11 @@ ME_LP1:
 
 GO_EXEC:
 		CALL	SPACE_GET_WORD	;Input address, c=1 if we have a word, c=0 if no word
+#if CPU8080
+		JP	C, GE_0		; If c=1 then we have a word to jump to
+#else
 		JR	C, GE_0		; If c=1 then we have a word to jump to
+#endif
 		JP	MAIN_MENU	; If c=0 then there is no word, abort
 GE_0:
 		CALL	PRINTI
@@ -383,18 +477,23 @@ GE_0:
 
 ;------------------------------------------------------------------------------
 ; Input from port, print contents
-
+#if CPU8080
+                ; No input command
+#else
 PORT_INP:	
 		CALL	SPACE_GET_BYTE	; Port address
 		LD	C, A
 		IN	A,(C)		; Read from port
 		CALL	SPACE_PRINT_BYTE
 		JP	MAIN_MENU
-
+#endif
 ;------------------------------------------------------------------------------
 ; Get a port address, write byte out
 ; Give the user a way to abort and avoid writing to a port
 
+#if CPU8080
+                ; No output command
+#else
 PORT_OUT:	
 		CALL	SPACE_GET_BYTE	; Port address
 		LD	C, A
@@ -403,7 +502,11 @@ PORT_OUT:
 		OUT	(C),A
 PO_0:
 		JP	MAIN_MENU
+#endif
 
+#if CPU8080
+                ; Don't do breakpoints here
+#else
 ; -------------------------------------------------------------------
 ; Breakpoint
 ; Note that this breakpoint implementation will not work if you have stuff on stack
@@ -639,6 +742,7 @@ GET_REGISTER:
 		LD	HL, DE
 		POP	DE
 		RET
+#endif          ; CPU8080 doesn't do breakpoints
 
 ;------------------------------------------------------------------------------
 ; Print a space, then get a byte from the serial console
@@ -657,9 +761,17 @@ SPACE_GET_BYTE:
 ;	A = non-hex char input (if CY=1)
 
 GET_BYTE:	CALL	GET_HEX_CHAR	;Get 1st HEX CHAR
+#if CPU8080
+                JP      NC, GB_1
+#else
 		JR  	NC, GB_1
+#endif
 		CP	' '		;Exit if not HEX CHAR (ignoring SPACE)
+#if CPU8080
+		JP 	Z, GET_BYTE	;Loop back if first char is a SPACE
+#else
 		JR 	Z, GET_BYTE	;Loop back if first char is a SPACE
+#endif
 		SCF			;Set Carry
 		RET			;or EXIT with delimiting char
 GB_1		PUSH	DE		;Process 1st HEX CHAR
@@ -670,9 +782,17 @@ GB_1		PUSH	DE		;Process 1st HEX CHAR
 		AND	0xF0
 		LD	D,A
 		CALL	GET_HEX_CHAR
+#if CPU8080
+		JP  	NC, GB_2		;If 2nd char is HEX CHAR
+#else
 		JR  	NC, GB_2		;If 2nd char is HEX CHAR
+#endif
 		CP	' '
+#if CPU8080
+		JP Z,	GB_RET1
+#else
 		JR Z,	GB_RET1
+#endif
 		SCF			;Set Carry
 		POP	DE
 		RET			;or EXIT with delimiting char
@@ -710,10 +830,18 @@ SPACE_GET_WORD:
 GET_WORD:
 		LD	DE,0
 		CALL	GET_HEX_CHAR	;Get 1st HEX CHAR
+#if CPU8080
+		JP  	NC, GW_LP
+#else
 		JR  	NC, GW_LP
+#endif
 					; Not HEX
 		CP	' '		; Is it SPACE
+#if CPU8080
+		JP 	Z, GET_WORD	; Loop back if first char is a SPACE
+#else
 		JR 	Z, GET_WORD	; Loop back if first char is a SPACE
+#endif
 		OR	A		; Otherwise, clear Carry and exit
 		RET			; 
 GW_LP:
@@ -727,7 +855,11 @@ GW_LP:
 		ADD	HL,HL
 		EX	DE,HL
 		OR	E
+#if CPU8080
+		JP	GW_LP
+#else
 		JR	GW_LP
+#endif
 
 ; -----------------------------------------------------------------------------
 ; Get HEX CHAR
@@ -778,7 +910,11 @@ PRINT:          LD       A,(HL)          ; Get character
                 RET      Z               ; Then RETurn on terminator
                 RST      08H             ; Print it
                 INC      HL              ; Next Character
+#if CPU8080
+                JP      PRINT
+#else
                 JR       PRINT           ; Continue until 00H
+#endif    
                 RET
 
 ; -----------------------------------------------------------------------------
@@ -880,6 +1016,9 @@ ADD_HL_A	ADD	A, L
 		INC	H
 		RET
 
+#if CPU8080
+                ; No disassemble command
+#else
 ;------------------------------------------------------------------------------
 ; Get a starting address to disassemble from
 ; Press C to disassemble each instruction and ESC to return to main menu
@@ -907,6 +1046,7 @@ DISZ_LP:
 		JR      NZ, DISZ_LP     ; Not ESC = loop
 DISZ_0:
 		JP	MAIN_MENU
+#endif
 
 ;------------------------------------------------------------------------------
 ; Set the address to the buffer where we want to upload the Intel HEX file
@@ -915,9 +1055,20 @@ DISZ_0:
 
 SET_BUFFER:
 		CALL	SPACE_GET_WORD	;Input address, c=1 if we have a word, c=0 if no word
+#if CPU8080
+		JP	NC, SE_0	; If c=0 then there is no word, abort
+#else
 		JR	NC, SE_0	; If c=0 then there is no word, abort
+#endif
 					; If c=1 then we have a word to load
+#if CPU8080
+                PUSH    HL
+                LD      HL, DE
+                LD      (hex_buffer), HL
+                POP     HL
+#else
 		LD	(hex_buffer),DE	; Store word
+#endif
 		CALL	PRINTI
 		DB	LF,CR,"HEX file buffer set to ",EOS
 		LD	HL, DE
@@ -938,20 +1089,38 @@ SE_0:
 ; timing out.
 GETHEXFILE:
 		LD	E,0		;ZERO ERROR COUNTER
+#if CPU8080
+#else
 		LD	IX, 0		; Byte counter
+#endif
+#if CPU8080
+		JP	GHDOLINE	; Jump straight to reading in the byte count
+#else
 		JR	GHDOLINE	; Jump straight to reading in the byte count
+#endif
 
 GHWAIT:
 		CALL	GETCHAR_ESC
+#if CPU8080
+		JP  	C, GHENDTO	; Timeout
+#else
 		JR  	C, GHENDTO	; Timeout
+#endif
 		CP	27		; ESC
+#if CPU8080
+		JP  	Z, GHENDTO	; Abort if ESC
+#else
 		JR  	Z, GHENDTO	; Abort if ESC
+#endif
 		CP	':'
+#if CPU8080
+		JP  	NZ, GHWAIT
+#else
 		JR  	NZ, GHWAIT
-
+#endif
 		; Handle a line
 GHDOLINE:	
-                        CALL	TGET_BYTE	;GET BYTE COUNT
+                CALL	TGET_BYTE	;GET BYTE COUNT
 		LD	B, A		;BYTE COUNTER
 		LD	C, A		;CHECKSUM
 
@@ -962,35 +1131,77 @@ GHDOLINE:
 		LD	L, A
 		; Add buffer start
 		PUSH	DE
+#if CPU8080
+                PUSH    HL
+                LD      HL, (hex_buffer)
+                LD      DE, HL
+                POP     HL
+#else
 		LD	DE, (hex_buffer)
+#endif
 		ADD	HL, DE
 		POP	DE
 		CALL	TGET_BYTE	;GET RECORD TYPE
+#if CPU8080
+		JP	C, GHENDTO
+#else
 		JR	C, GHENDTO
+#endif
 		CP	1
+#if CPU8080
+		JP 	Z, GHEND	;IF RECORD TYPE IS 01 THEN END
+#else
 		JR 	Z, GHEND	;IF RECORD TYPE IS 01 THEN END
-		
+#endif	
 		; Assuming everything else is data record...
 GHLOOP:
 		CALL	TGET_BYTE	;GET DATA
+#if CPU8080
+		JP	C, GHENDTO
+#else
 		JR	C, GHENDTO
+#endif
 		LD	(HL),A
 		INC	HL
+#if CPU8080
+#else
 		INC	IX
+#endif
+#if CPU8080
+                DEC     B
+                JP      NZ, GHLOOP
+#else
 		DJNZ	GHLOOP		;Repeat for all data in line
+#endif
 
 		CALL	TGET_BYTE	;GET CHECKSUM
+#if CPU8080
+		JP	C, GHENDTO
+#else
 		JR	C, GHENDTO
+#endif
 		XOR	A
 		CP	C		;Test Checksum = 0
+#if CPU8080
+		JP 	Z, GHWAIT0	; No error
+#else
 		JR 	Z, GHWAIT0	; No error
+#endif
 		INC	E
+#if CPU8080
+		JP  	NZ, GHWAIT0
+#else
 		JR  	NZ, GHWAIT0
+#endif
 		DEC	E
 GHWAIT0:
 		LD	A, '.'		; Output tick
 		CALL	PUT_CHARBC
+#if CPU8080
+		JP	GHWAIT
+#else
 		JR	GHWAIT
+#endif
 		
 GHEND		; We come here on detecting RECORD TYPE = 1 but there are 2 more 
 		; characters in this last record
@@ -1003,11 +1214,14 @@ GHEND1:
 		CALL	PRINT_BYTE
 	
 		CALL	PRINT_SPACE
+#if CPU8080
+#else
 		PUSH	IX		; Byte count
 		POP	HL
 		CALL	PRINT_HL	; Print byte count
 		CALL	PRINTI
 		DB	" BYTES TRANSFERRED",EOS
+#endif
 		JP	MAIN_MENU
 		
 ;-----------------------------------------------------------------------------
@@ -1018,7 +1232,11 @@ GHEND1:
 ;	A = non-hex char input (if CY=1)
 
 TGET_BYTE:	CALL	TGET_HEX_CHAR	; Get 1st HEX CHAR
+#if CPU8080
+		JP  	C,  TGB0        ; Received ESC
+#else
 		JR  	C,  TGB0        ; Received ESC
+#endif
 		RLCA			; Shift 1st HEX CHAR
 		RLCA
 		RLCA
@@ -1026,7 +1244,11 @@ TGET_BYTE:	CALL	TGET_HEX_CHAR	; Get 1st HEX CHAR
 		AND	0xF0
 		LD	D,A
 		CALL	TGET_HEX_CHAR	;Get 2nd HEX CHAR
+#if CPU8080
+		JP  	C, TGB0         ; Received ESC
+#else
 		JR  	C, TGB0         ; Received ESC
+#endif
 		OR	D
 		LD	D,A		;Save byte
 		ADD	A,C		;Add byte to Checksum
@@ -1084,7 +1306,11 @@ IN_CHARBC:
 GET_CHAR:	
 		LD	A,(ECHO_ON)
 		OR	A
+#if CPU8080		
+                JP	Z, GET_CHAR_NE
+#else
 		JR	Z, GET_CHAR_NE
+#endif
 GET_CHAR_LP:
 		CALL	GET_CHAR_NE
 		CP	' '	; Do not echo control chars
@@ -1100,7 +1326,11 @@ GET_CHAR_LP:
 GETCHAR_ESC:
 		CALL	IN_CHARBC	; This is a blocking call
 		CP	A, 27		; ESC
+#if CPU8080
+		JP	Z, TGC_TOBC
+#else
 		JR	Z, TGC_TOBC
+#endif
 		OR	A		; C=0
 		RET
 TGC_TOBC:

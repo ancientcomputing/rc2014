@@ -1,4 +1,4 @@
-Source
+RC2014 Source Files
 <p>
 These are the source files.
 <p>
@@ -14,6 +14,8 @@ mon32K.asm - Monitor/Debugger for the RC2014.
 Hacked in a big way to remove all LED/matrix keyboard code. 
 It now uses RST calls for console input/output via the BIOS code in int32K.asm. 
 Disabled a bunch of other commands as well. 
+<p>
+NEW: Added in assemble-time conditional CPU8080 to assemble into a 8080-compatible binary for the 8085 CPU Board. Change the #define CPU8080 to 1 for this. Otherwise, leave the #define to 0.
 <p>
 disz80.asm - John Kerr's Z80 disassembler for inline disassembly. Originally published in the SUBSET column of Personal Computer World 1987. Used in the Spectrum UTILITY3 program.
 <p>
