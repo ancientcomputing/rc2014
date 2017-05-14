@@ -26,6 +26,10 @@ With 200ns devices, it will even work with the Z80 CPU+ board equiped with a bli
 <p>
 The original board design had disconnected A0, A1 lines which have now been fixed.   
 <p>
+<b>Real Retro UART board (TESTED)</b>
+<p>
+A basic UART board using ancient UART devices like the 6402, AY-3-1015 or similar.
+<p>
 <hr>
 <p>
 <b>IMPORTANT</b>: These designs unless described otherwise are at the prototype stage as of now. I have put in the initial board orders at OSH Park and have not tested any of the designs. If you do find errors, please flag them!
