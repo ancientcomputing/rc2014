@@ -4434,7 +4434,7 @@ NOTCR:  CPI     15H     ;TEST IF CONTROL-U
         CALL    CRLF    ;GET CR/LF
         JMP     REIN    ;GO RE-ENTER
 NOTCO:  CPI     7FH     ;TEST IF RUBOUT
-        JNZ     NOTCH   ;BRIF NOT
+        JNZ     NOTBS   ;BRIF NOT
         LDA     TAPES   ;GET PAPER TAPE SW
         RAR             ;TEST IF LOAD
         JC      TREAD   ;IGNORE IF LOAD
@@ -5820,6 +5820,7 @@ RECI:   CALL    CASI    ;GET TYPE
         LXI     H,0     ;INITIAL CHECKSUM
 RECI1:  CALL    CASI    ;INPUT BYTE
         STAX    D       ;STORE IT
+        INX     D
         CALL    CKSUM   ;UPDATE CKSUM, PUT ADDR IN LIGHTS
         DCR     B       ;LOOP ON COUNT
         JNZ     RECI1
