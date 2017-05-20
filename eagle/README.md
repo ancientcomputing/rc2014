@@ -30,6 +30,10 @@ The original board design had disconnected A0, A1 lines which have now been fixe
 <p>
 A basic UART board using ancient UART devices like the 6402, AY-3-1015 or similar.
 <p>
+<b>Simple ROM/RAM board (TESTED)</b>
+<p>
+A simple board providing 32KB of RAM and 32KB of ROM. Usable with EPROM or EEPROM. Switchable to allow ROM at the top of memory or at the bottom of memory. This provides for compatibility with 6502 or 680x CPU boards.
+<p>
 <hr>
 <p>
 <b>IMPORTANT</b>: These designs unless described otherwise are at the prototype stage as of now. I have put in the initial board orders at OSH Park and have not tested any of the designs. If you do find errors, please flag them!
