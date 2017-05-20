@@ -1,6 +1,6 @@
 <b>Simple ROM/RAM Board for RC2014</b>
 <p>
-This is a simple ROM+RAM board that full outfit an RC2014 system with memory.
+This is a simple ROM+RAM board that fully outfit an RC2014 system with memory.
 <p>
 Instead of ROM and RAM on separate boards, I wanted to combine them in order to reduce the number of boards needed to put together a basic system. 
 <p>
@@ -16,4 +16,7 @@ Boards can be ordered from OSH Park at the following link:
 <p>
 <a href="https://www.oshpark.com/shared_projects/Yfu9JolG"><img src="https://www.oshpark.com/assets/badge-5b7ec47045b78aef6eb9d83b3bac6b1920de805e9a0c227658eac6e19a045b9c.png" alt="Order from OSH Park"></img></a>
 <p>
-
+Parts are:
+<br>27256 or 28C256
+<br>Most 32KB RAM devices include those that are shipped with the RC2014 RAM cards<br>74LS139, 74HCT139 or 74ACT139
+<p>
