@@ -239,7 +239,7 @@ PROTC:  OUT     0FEH    ;SEND IT
         CALL    COPYD   ;COPY TO TRND<X> IN RAM TABLE
         MVI     M,2     ;SET RANDOM SWITCH
 ;        IF      CPM
-;        CALL    NEW0    ;AUTOMATIC "NEW"
+        CALL    NEW0    ;AUTOMATIC "NEW"
 ;        ENDIF
 
         LXI     H,VERS  ;POINT VERSION MESSAGE
@@ -4434,7 +4434,7 @@ NOTCR:  CPI     15H     ;TEST IF CONTROL-U
         CALL    CRLF    ;GET CR/LF
         JMP     REIN    ;GO RE-ENTER
 NOTCO:  CPI     7FH     ;TEST IF RUBOUT
-        JNZ     NOTBS   ;BRIF NOT - Udo Munk's update
+        JNZ     NOTCH   ;BRIF NOT
         LDA     TAPES   ;GET PAPER TAPE SW
         RAR             ;TEST IF LOAD
         JC      TREAD   ;IGNORE IF LOAD
@@ -4990,6 +4990,36 @@ PRLIN:  ;   EQU     $
 ;
 EM      EQU     0FEH
 ;
+#if 0
+ULERR:  ;RST     6
+        call    RST6
+        DB      'UL',EM,FATAL   ;NOTE FATAL = CODE FOR RST 6
+ZMERR   EQU     $-1             ;LOG(X<=0),SQR(-X),0 DIVIDE
+        DB      'OF',EM,FATAL
+STERR   EQU     $-1             ;ERROR IN EXPRESSION STACK
+        DB      'ST',EM,FATAL
+SNERR   EQU     $-1             ;DELIMITER ERROR
+        DB      'SN',EM,FATAL
+RTERR   EQU     $-1             ;RETURN & NO GOSUB
+        DB      'RT',EM,FATAL
+DAERR   EQU     $-1             ;OUT OF DATA
+        DB      'DA',EM,FATAL
+NXERR   EQU     $-1             ;NEXT & NO FOR / >8 FOR'S
+        DB      'NX',EM,FATAL
+CVERR   EQU     $-1             ;CONVERSION ERROR
+        DB      'CV',EM,FATAL
+CKERR   EQU     $-1             ;CHECKSUM ERROR
+        DB      'CK',EM,FATAL
+;
+; NON-FATAL ERRORS
+;
+OVERR   EQU     $-1             ;OVERFLOW ERROR
+        DB      'OV',EM
+        RET                     ;RETURN TO ROUTINE
+UNERR:  RST     6               ;CALL   ERROR ROUTINE
+        DB      'UN',EM
+        RET
+#else
 ULERR:
         push    psw
         mvi     a, 'a'
@@ -5033,6 +5063,7 @@ UNERR:
         call    RST6
         DB      'UN',EM
         RET
+#endif
 ;
 ; CONTINUATION OF ERROR MESSAGE ROUTINE (RST 6)
 ;
@@ -5789,7 +5820,6 @@ RECI:   CALL    CASI    ;GET TYPE
         LXI     H,0     ;INITIAL CHECKSUM
 RECI1:  CALL    CASI    ;INPUT BYTE
         STAX    D       ;STORE IT
-        INX     D       ; Udo Munk's update
         CALL    CKSUM   ;UPDATE CKSUM, PUT ADDR IN LIGHTS
         DCR     B       ;LOOP ON COUNT
         JNZ     RECI1
@@ -6083,7 +6113,7 @@ ROMEN   EQU     $-1
 ; ALL CODE ABOVE THIS POINT IS READ ONLY AND CAN BE PROM'ED
 ;
 ;
-RAM     EQU     TBASE+8192      ;$
+RAM     EQU     TBASE+9216      ;$
 ;
 BZERO   EQU     $
 FORNE:  DS      1       ;# ENTRYS IN TABLE (MUST BE HERE)
