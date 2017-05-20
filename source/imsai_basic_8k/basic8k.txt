@@ -1,0 +1,721 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+				IMSAI
+
+			       8K BASIC
+
+			      Version 1.4
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	 Copyright 1977 IMSAI Manufacturing Corporation
+			14860 Wicks Boulevard
+			San Leandro, California 94577
+			Made in the U. S. A.
+			All rights reserved worldwide.
+
+
+81-0000036 Rev. B
+
+						BASIC 8A Rev. 0
+						Loading
+
+
+			    IMSAI 8K BASIC
+			      Version 1.4
+
+I. Loading
+
+	IMSAI 8K BASIC is available on three media: paper tape,
+	Tarbell format cassette, and EPROM.
+
+	The paper tape and cassette versions require a minimum of 12K
+	of RAM installed at contiguous addresses from zero up.  More
+	RAM will permit longer BASIC programs and/or more variables.
+
+	A. Loading the Paper Tape Version
+
+		Use the IMSAI Paper Tape Loader, as supplied with your
+		IMSAI 8080 to load the paper tape.  Follow the
+		instructions for loading paper tapes in the User
+		Manual (Chapter 12, System Software).  For the
+		convenience of those who do not have the IMSAI Paper
+		Tape Loader, a copy of its documentation is included
+		with each order for BASIC on paper tape.
+
+		If your memory has WRITE PROTECT switches, turn the
+		first 8K bytes off.
+
+	B. Loading the Cassette Version
+
+		Use the IMSAI Tape Cassette Bootstrap Loader (PGM-5A)
+		to load the cassette.  Follow the instructions
+		supplied with the loader.  A copy of the loader
+		documentation is included with the cassette as an aid
+		those who do not have the IMSAI loader.
+
+		Alternately, IMSAI's Tape Cassette Operating System
+		(PGM-2A) may be used to load the BASIC cassette.  In
+		this case, start execution with the TCOS command
+		EXEC 0.
+
+		If your memory has WRITE PROTECT switches, turn the
+		first 8K bytes off.
+
+	C. Installing the EPROM Version in Your System
+
+		Insert the 32 chips in two IMSAI PROM 4 boards, taking
+		care that each chip has pin 1 up and is in the correct
+		socket for its address.
+
+		Jumper the boards for address 0 and 1000 hex and install
+		them in the machine.
+
+		Install RAM starting at address 2000 hex.  4K of RAM
+		is adequate for many programs; 8K BASIC will make use
+		of as much RAM as is installed at contiguous
+		addresses starting at 2000 hex.
+
+
+
+
+
+
+
+									1
+						BASIC 8A Rev. 0
+						Starting, Programs
+
+
+
+II. Starting BASIC
+
+	Hit STOP, RESET, RUN (if the loader started BASIC, skip this
+	step.)
+
+	BASIC should type "READY".
+
+	Hit the CR key and then type NEW CR.  This step is essential
+	when BASIC is first started.
+
+
+III. Restarting BASIC
+
+	If the system gets hung up and will not respond to control-C,
+	try restarting BASIC.
+
+	Do this by hitting STOP, RESET, RUN in the front panel.
+
+	Your program should still be in memory and may be LISTed,
+	modified, or RUN.
+
+
+IV. Entering a Program from the Keyboard
+
+	Type the command NEW to delete the previous program.
+
+	Enter the program one line at a time, typing a CR after each
+	line.
+
+	Each statement must be numbered, but they need not be typed
+	in order.  The program will be listed or executed in line
+	number order.  It is suggested that successive line numbers
+	differ by 10 or more to permit inserting lines later.
+
+	A line may be deleted by typing its line number followed by
+	a CR.
+
+	A line may be replaced by typing the same line number
+	followed by the updated statement and CR.
+
+	A line may be inserted by typing a new, unique line number,
+	followed by the statement and CR.
+
+	A line may be retyped if a mistake is noticed before the CR
+	is typed by typing control-U.
+
+	The last character may be deleted by typing the RUBOUT key.
+	A back slash, the deleted character,  and another back
+	slash will echo.  On a CRT terminal, you may delete the
+	previous character by typing control-H which will erase the
+	previous character and back the cursor up one position.
+	Now type the correct character and continue.
+
+
+V. Entering a Program from Paper Tape
+ 
+	Type the command NEW to delete the previous program.
+
+
+
+2
+						BASIC 8A Rev. 0
+						Listing
+
+
+
+	Mount the paper tape in the Teletype reader starting
+	anywhere in the leader.
+
+	Type the command TAPE.
+
+	Manually start the reader, if necessary.
+
+	If the tape was not punched by this BASIC, after it has
+	been read, stop the reader and type KEY CR.
+
+
+VI. Listing the Program
+
+	Type the command LIST CR.
+
+	To list a single statement, type LIST line number CR.
+
+	To list a portion of the program, type LIST line number,
+	line number CR.
+
+	To interrupt a LIST in progress, type control-C.
+
+
+VII. Punching the Program on Paper Tape
+
+	Type SAVE, but do not type the CR.
+
+	Turn on the teletype punch.
+
+	Hits CR.
+
+	The program will be punched and listed.
+
+	Turn off the punch.
+
+
+VIII. Running the Program
+
+	Type the command RUN.
+
+	The program will run to completion until an error is
+	encountered or until a stop statement is executed.
+
+	The program may be terminated by typing control-C.
+
+	INPUT statements will prompt with a question mark.  Type
+	the value and a CR.  Multiple values may be input separated
+	by commas.
+
+
+IX. Error Messages
+
+	BASIC error messages are of the form: XX ERR @ 9999 where XX
+
+
+
+
+
+
+
+									3
+						BASIC 8A Rev. 0
+						Error Messages
+
+
+
+	is the error code and 9999 is the line number.  (Immediate
+	commands print no line number.)
+
+	The following errors terminate program execution:
+
+		Code	Meaning
+
+		 DA	Out of data.  A READ statement
+			tried to read another DATA
+			value and there were no more
+			DATA statements.
+
+		 NX	NEXT with no matching FOR or
+			more than 8 nested FORs.
+
+		 UL	Unidentified line number in
+			IF...THEN, GOTO, or
+			GOSUB statement.
+
+		 RT	RETURN encountered and no
+			GOSUB in effect.
+
+		 OF	Fatal overflow: division by zero,
+			attempt to take log of a number
+			less than or equal to zero, or
+			square root of a negative number
+			(other overflow errors are
+			non-fatal; see below).
+
+		 SN	Syntax error: unidentified
+			statement or incorrectly formed
+			statement; BASIC can't
+			understand what you're saying.
+
+		 ST	Execution stack (internal)
+			error. Either:
+			1) a NEW command was not given
+			after power-up;
+			2) too few or too many argu-
+			ments for a function; or
+			3) some syntax errors give
+			the "ST" error code.
+
+	The following errors are non-fatal; i.e., a message is
+	printed and program execution continues.
+
+
+		Code	Meaning
+
+		 UN	Underflow: number whose absolute
+			value is less than 2.71050 E-20
+			and greater than zero.
+
+
+
+
+
+
+
+
+4
+						BASIC 8A Rev. 0
+						Debugging
+
+
+
+		 OV	Overflow: number whose absolute
+			value is greater than 5.76461 E18
+			(slightly higher values may be
+			reached using addition or
+			subtraction).
+
+
+X. Debugging
+
+	After correction, the program may be restarted with the
+	command GOTO 9999 where 9999 is the line number given
+	in the message, or with the CON command.
+
+	The program may be stopped by typing control-C.
+
+	Variables may be inspected with the PRINT (or ?) command.
+
+	Variables may be modified with the LET or INPUT commands.
+
+	Output may be suppressed without stopping the program by
+	typing control-O.  Another control-O will turn printout
+	on again.
+
+
+XI. References
+
+	This manual is not intended to be an introduction to the
+	BASIC language.  Users with no familiarity with BASIC are
+	referred to the following books, all available from IMSAI:
+
+	  My Computer Likes Me When I Speak BASIC, by Bob Albrecht
+		An introduction to BASIC for those with no
+		previous computer experience.
+
+	  BASIC-Plus Manual, Digital Equipment Corp.
+		User manual for a minicomputer BASIC; 8K BASIC is
+		similar to languages described in first few
+		sections.
+
+	  What To Do After You Hit Return, People's Computer Company
+		A book of game programs written in BASIC.
+
+
+XII. IMSAI BASIC Language
+
+	Notation: In the following two sections
+
+		CAPITAL letters represent words that are used
+		verbatim.
+
+		Lower case words are representative, for instance,
+		"variable" means "X", "Y1", "Q9$" or any legal
+		BASIC variable name.
+
+		[square brackets] enclose optional items.
+
+		"..." means the variable or expression may be
+		repeated any number of times.
+
+
+									5
+						BASIC 8A Rev. 0
+						Statements
+
+
+
+		Don't forget the commas (or semi-colons) between
+		the repetitions.
+
+
+
+	Statements:
+
+	   [LET] variable=expression
+
+	   DIM variable (dimensions)
+		for numeric variables only; should appear before
+		variable is used.
+
+	   PRINT expression, expression ...
+		prints values at 14 column tab stops
+
+	   PRINT expression; expression ...
+		prints without space between
+
+	   PRINT
+		alone prints carriage return
+
+		All PRINTouts end with a carriage return unless
+		the statement contained a comma or semi-colon
+		after the last expression.
+
+	   ?
+		Same as PRINT
+
+	   INPUT variable, variable ...
+		prompts with "?" and accepts typed-in numbers
+		or strings.  If "text" is used in place of a
+		variable, it is typed out.
+
+	   REM any text
+
+	   !
+		Same as REM
+
+	   IF expression relop expression THEN line number or
+	      statement
+		"relop" can be <, =, >, <> (not equal), >=, <=.
+
+	   FOR expression=expression TO expression [STEP expression]
+
+	   NEXT variable
+
+	   GOTO line number
+
+	   GOSUB line number
+
+	   INPUT LINE string variable
+		Accepts typed-in text terminated by a carriage
+		return.  Any quotes, commas or spaces in the
+		text are transmitted.
+
+	   RETURN
+
+
+
+6
+						BASIC 8A Rev. 0
+						Statements, Expressions
+
+
+
+	   ON expression GOTO line number, line number ...
+
+	   ON expression GOSUB line number, line number ...
+
+	   DATA value, value ...
+
+	   RESTORE
+
+	   READ variable, variable ...
+
+	   DEF FN variable (variable(s))=expression
+
+	   CHANGE array name=string variable
+	   CHANGE string variable=array name
+
+	   STOP
+		stops execution; program can be restarted
+		with CON
+
+	   END
+		optional; stops execution, program cannot
+		be restarted with CON
+
+	   CALL expression
+		calls user's machine language routine at
+		address given by expression
+
+	   POKE address, value
+		stores 8-bit value into memory; e.g., for
+		transmitting data to machine-language
+		routing.
+
+	   OUT port, value
+		outputs value to port for accessing
+		non-standard I/O devices
+
+	   RANDOMIZE
+
+	Expressions
+
+		Variables consist of a letter or a letter and
+		a digit, followed by a dollar sign for
+		string-valued variables.
+
+		Number range is 2.7105E-20 to 5.7646E18.
+
+		Numeric operators available are +, -, *, / and
+		^ (raise to a power).  On some keyboards ^ is ^.
+
+		Strings may be 0 to 238 characters long.
+		String constants (literal texts) may be
+		enclosed in single or double quotes.
+
+		The "+" operator concatenates strings.
+
+
+
+
+
+
+									7
+						BASIC 8A Rev. 0
+						Functions
+
+
+
+		Functions Available:
+
+		   All arguments may be expression. Those
+		   ending in "$" are string-valued.
+
+		   ABS(x)	    Absolute value
+		   SQR(x)	    Square root
+		   INT(x)	    Largest integer <= x
+		   SGN(x)	    Sign of x: -1, 0 or 1
+		   RND[(x)]	    Random number between
+				    0 and x.  If (x) is
+				    omitted, range is 0 and 1.
+		   SIN(x)
+		   COS(x)
+		   TAN(x)
+		   ATN(x)
+		   LN(x)	    Natural logarithm
+		   LOG(x)	    Base 10 logarithm
+		   EXP(x)
+		   PEEK(address)    Contents of memory location
+		   PI		    3.14159
+		   LEN(string)	    Length
+		   INSTR(x,string1,string2)
+				    Position of string2 in string1
+				    starting at position x; 0 if
+				    not found
+		   ASCII(string)    ASCII value of character
+		   CHR$(x)	    String consisting of character
+				    with ASCII value x
+		   STRING$(x,y)	    String of x characters with
+				    ASCII value y
+		   NUM$(x)	    Converts number to string of
+				    digits
+		   VAL(string)	    Numeric value of string (gives
+				    CV error if not numeric)
+		   SPACE$(x)	    String of x spaces
+		   LEFT$(string,n)  Characters 1 through n of
+				    string
+		   RIGHT$(string,n) Characters n through end
+				    of string
+		   MID$(string,m,n) n characters of string
+				    starting at character m.
+		   POS(x)	    Carriage position.  First
+				    column is 0, x is ignored.
+		   TAB(x)	    Use only with PRINT.  Moves
+				    carriage to column x.
+		   INP(port)	    Input from I/O port
+
+
+		Multiple statements on one line are allowed if
+		separated by colons.
+
+
+
+
+
+
+
+
+
+8
+						BASIC 8A Rev. 0
+						Immediate Commands
+
+
+
+
+XIII. Immediate Commands
+
+	The following may be typed without a line number for
+	immediate execution.
+
+		LIST
+		RUN
+		XEQ	Like RUN but does not delete data
+		GOTO
+		NEW
+		NEW*	Deletes program without deleting
+			data, for chaining
+		TAPE
+		SAVE
+		KEY
+		FREE
+		CON	Continue from STOP, control-C or
+			after correcting an error
+		IF	Typed without the THEN clause to
+			test variables.  For example:
+			IF A=B CR. If you get,
+			UL ERR @ LINE then the relation is
+			true.  Otherwise, it's false.
+
+	In addition, almost all BASIC program statements, if typed
+	without a line number, will be executed immediately.
+
+
+XIV. Chaining
+
+	Some applications involve a program too large to fit the
+	available memory.  Techniques described here permit
+	"chaining" multiple programs while transmitting variable
+	values from one to the next.
+
+		Load and RUN the first program in the normal
+		manner.
+
+		Use "NEW*" rather than "NEW" to delete the program
+		without deleting its data.
+
+		Enter or load the next program in the normal manner.
+
+		Use XEQ rather than RUN to start the program without
+		clearing the data are.
+
+		Repeat the preceding three steps for each additional
+		program.
+
+
+
+
+
+
+
+
+
+
+
+									9
+						BASIC 8A Rev. 0
+						Compatibility, Known Problems
+
+
+
+
+XV. Compatibility
+
+	A. With BASIC-Plus
+
+		Line numbers range from 1 to 9999 only.
+
+		Subscripts not allowed on string variables.
+
+		Number range: 2.7105-E20 to 5.7646E18.
+
+		Only the statements, operators, and functions
+		listed above area available.
+
+	B. With Previous Release 1.3
+
+		Log function gives Base 10 Logarithm rather than
+		natural logarithm.
+
+		New function LN gives natural logarithm.
+
+		PRINT ... TAB(X) ...: If X is less than the column
+		position goes to a new line.  Old version continued
+		at current column.
+
+
+XVI. Known Problems
+
+	"FRE" returns a number that includes storage actually in use
+	for variables.
+
+	If program size exceeds memory available, BASIC bombs out.
+
+	If data (variable values) exceed size of memory not used by
+	program, program and possibly interpreter is destroyed.
+
+	If program jumps (with a GOTO) out of a FOR loop before the
+	loop has completed then later executes the same FOR
+	statement, BASIC gets confused.
+
+	There is no provision for reserving memory for machine
+	language routines other than by addressing an additional
+	board at non-contiguous address.
+
+	Strings over about 238 characters cause a variety of
+	problems including interfering with the current FOR loop
+	and destroying the BASIC interpreter.
+
+
+
+
+
+
+
+
+
+
+
+
+10
