@@ -8,9 +8,9 @@
 ;
 
 ;
-; Assembly the sections of the Monitor
+; Assemble the sections of the Monitor
 ;
-	.org $e000
+	.org $f800
 	
 	; The following files should NOT define absolute addresses
 	
