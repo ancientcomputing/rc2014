@@ -1,7 +1,9 @@
 ; 6502 BIOS 
 ; Based on original code by Daryl Rictor
-; Adapted to Real Retro UART board for RC2014
-; Renamed to rruart.asm
+; Adapted to 16550 UART board for RC2014
+; Renamed to 16c550.asm
+;
+; Note: Assumes the use of a 16C550 with autoflow control
 ;
 ; ----------------- assembly instructions ---------------------------- 
 ;
@@ -11,7 +13,7 @@
 ;
 ;*** I/O Locations *******************************
 ; Define the i/o address of the UART chip
-;*** Real Retro UART ************************
+;*** 16C550 UART ************************
 
 uart_base       = $c0c0
 uart_reg0       = $c0c0
@@ -22,7 +24,7 @@ uart_reg4       = $c0c4
 uart_reg5       = $c0c5
 uart_reg6       = $c0c6
 uart_reg7       = $c0c7
-uart_xmit       = uart_reg0
+uart_xmit       = uart_reg0     ; Used by upload.asm
 ;uart_recv       = $c040
 ;uart_status     = $c041
 
@@ -36,39 +38,22 @@ uart_xmit       = uart_reg0
  
 
 uart_init
-                lda     #$80                  ; Line control register, Set DLAB=1
+                lda     #$80            ; Line control register, Set DLAB=1
                 sta     uart_reg3
-                lda     #$01                    ; 115200 with 1.8432MHz;  OSC / (16 * Baudrate)
-                sta     uart_reg0    ; Divisor latch
+                lda     #$01            ; 115200 with 1.8432MHz;  OSC / (16 * Baudrate)
+                sta     uart_reg0       ; Divisor latch
                 lda     #$00
-                sta     uart_reg1           ; Divisor latch
-                LDA     #$03                  ; Line control register, 8N1, DLAB=0
+                sta     uart_reg1       ; Divisor latch
+                LDA     #$03            ; Line control register, 8N1, DLAB=0
                 sta     uart_reg3
-                LDA     #$02                  ; Modem control register
-                sta     uart_reg4    ; Enable RTS
-                LDA     #$87                  ; FIFO enable, reset RCVR/XMIT FIFO
+                LDA     #$02            ; Modem control register
+                sta     uart_reg4       ; Enable RTS
+                LDA     #$87            ; FIFO enable, reset RCVR/XMIT FIFO
                 sta     uart_reg2
-                lda     #$01                  ; Enable receiver interrupt
+                lda     #$01            ; Enable receiver interrupt
                 sta     uart_reg1
-                jsr     AFE_16C550
-                ; Nothing to init
-        IF 0
-                ldx     #4
-                lda     #$0a
-ui_loop
-                jsr     uart_output
-                dex
-                bne     ui_loop
-                lda     #$0d
-                jsr     uart_output
-                ldx     #'1'
-eeee
-                txa
-                jsr     uart_output
-                inx    
-                jmp     eeee
-        ENDIF
-                rts                      ; done
+                jsr     AFE_16C550      ; Enable auto flow control
+                rts                     ; done
                 
 ;---------------------------------------------------------------------
 ; Input char from UART (blocking)
@@ -107,7 +92,7 @@ uart_out1
                 rts                      ; done
 
 ;---------------------------------------------------------------------
-
+; Enable autoflow control
 AFE_16C550
                 LDA     #$87                  ; Trigger level, FIFO enable, reset FIFO
                 sta     uart_reg2
