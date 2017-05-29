@@ -1,4 +1,5 @@
 ;---------------------------------------------------------------------
+; 6502 Monitor
 ; Modified for RC2014
 ; Changes are copyright Ben Chong and freely licensed to the community
 ; ----------------- assembly instructions ---------------------------- 
@@ -17,7 +18,8 @@
  	.include upload.asm
 
         ; Change this line according to the type of UART board 
-      	.include rruart.asm	   ; uart init
+;      	.include rruart.asm	   ; uart init
+      	.include 16c550.asm
 
  	.include sbcmon.asm         ; actual monitor
 
