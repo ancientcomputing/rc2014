@@ -348,7 +348,41 @@ ghc_done
 ghc_abort
         sec     ; Set carry
         rts
+        
+;---------------------------------------------------------------------       
 
+helptxt
+                .byte   $0d,$0a,"6502 Monitor RC2014 v0.1.1"
+                .byte   CR,LF,"?              Print this help"
+		.byte	CR,LF,"D XXXX         Dump memory from XXXX"
+		.byte	CR,LF,"E XXXX         Edit memory from XXXX"    ;; CR to skip"
+		.byte	CR,LF,"G XXXX         Go execute from XXXX"
+		.byte	CR,LF,":sHLtD...C     Load Intel HEX file, ':' is part of file",0
+helptxt2:
+		.byte   CR,LF,"               ESC to quit when upload is done"
+                .byte   $0d, $0a
+                .byte   $00	
+
+;---------------------------------------------------------------------    
+                
+go_help
+        lda     #CR
+        ldx   #$ff              ; set txt pointer
+gh_loop
+        inx                     ;
+        JSR   Output_char            ; put character to Port
+        lda   helptxt,x         ; get message text
+        bne   gh_loop      ; 
+        tax             ; Init x = 0
+gh_loop2
+        lda     helptxt2, x
+        beq     gh_end
+        jsr     output_char
+        inx
+        bne     gh_loop2
+gh_end
+        jmp     monitor_loop
+        
 ;---------------------------------------------------------------------
 ; Display byte at an address
 ; Change byte at the address
@@ -430,19 +464,8 @@ gm_not_enter
         
 gm_end
         jmp     monitor_loop
-        
-;---------------------------------------------------------------------
-        
-go_help
-        lda     #CR
-        ldx   #$ff              ; set txt pointer
-gh_loop
-        inx                     ;
-        JSR   Output_char            ; put character to Port
-        lda   helptxt,x         ; get message text
-        bne   gh_loop      ; 
-        jmp     monitor_loop
-        
+
+
 ;---------------------------------------------------------------------
 
 go_dump
@@ -543,15 +566,7 @@ buildtxt
                 .byte   "6502 Board for RC2014"
                 .byte   $0d, $0a
                 .byte   $00
-helptxt
-                .byte   $0d,$0a,"6502 Monitor RC2014 v0.1.0"
-                .byte   CR,LF,"?              Print this help"
-		.byte	CR,LF,"D XXXX         Dump memory from XXXX"
-		.byte	CR,LF,"E XXXX         Edit memory from XXXX; CR to skip"
-		.byte	CR,LF,"G XXXX         Go execute from XXXX"
-		.byte	CR,LF,":sHLtD...C     Load Intel HEX file, ':' is part of file"
-                .byte   $0d, $0a
-                .byte   $00		
+	
 
 
 ;end of file
