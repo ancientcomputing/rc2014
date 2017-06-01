@@ -25,18 +25,17 @@ uart_reg5       = $c0c5
 uart_reg6       = $c0c6
 uart_reg7       = $c0c7
 uart_xmit       = uart_reg0     ; Used by upload.asm
-;uart_recv       = $c040
-;uart_status     = $c041
 
 ;
 ;***********************************************************************
 ; UART I/O Support Routines
-
+; We'll use Daryl's routine names for compatibility with his software/code
+; Otherwise, we'll use UART-agnostic nomemclature
 
 ;---------------------------------------------------------------------
 ;
  
-
+ACIA1_init
 uart_init
                 lda     #$80            ; Line control register, Set DLAB=1
                 sta     uart_reg3
@@ -58,6 +57,7 @@ uart_init
 ;---------------------------------------------------------------------
 ; Input char from UART (blocking)
 ; Exit: character in A
+ACIA1_Input
 uart_input
                lda      uart_reg5           ; Serial port status             
                and      #$01               ; is recvr full
@@ -68,6 +68,7 @@ uart_input
 ;---------------------------------------------------------------------
 ; Non-waiting get character routine 
 ; Scan for input (no wait), C=1 char, C=0 no character
+ACIA1_Scan
 uart_scan
                 clc
                 lda   uart_reg5        ; Serial port status
@@ -81,6 +82,7 @@ uart_scan2     rts
 ; output to OutPut Port
 ; Entry: character in A
 ; Exit: character in A
+ACIA1_Output
 uart_output   
                 pha                      ; save registers
 uart_out1     

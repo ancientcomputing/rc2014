@@ -10,29 +10,20 @@
 ;
 ;*********************************************************************       
 ;  local Zero-page variables
-;
-xsav           =     $30               ; 1 byte
-ysav           =     $31               ; 1 byte
-rowcount        =       $32
-;Prompt         =     $32               ; 1 byte   
-;linecnt        =     $33               ; 1 byte
-;Modejmp        =     $34               ; 1 byte
-;Hexdigcnt      =     $35               ; 1 byte
-;OPCtxtptr      =     $36               ; 1 byte
-;Memchr         =     $37               ; 1 byte
-Startaddr      =     $38               ; 2 bytes
-Startaddr_H    =     $39
-;Addrptr        =     $3a               ; 2 bytes
-;Addrptr_H      =     $3b
-Hexdigits      =     $3c               ; 2 bytes
-Hexdigits_H    =     $3d
-;Memptr         =     $3e               ; 2 bytes
-;Memptr_H       =     $3f
-strptr          =     $40
-strptrh         =     $41		; temporary string pointer (not preserved across calls)
-;
+; Modified from Daryl's code so that we overlap with EhBASIC as little
+; as possible. This was needed to debug EhBASIC during the porting process
+
+ysav            =       $e0               ; 1 byte
+rowcount        =       $e1               ; 1 byte
+Startaddr       =       $e2               ; 2 bytes
+Startaddr_H     =       $e3
+Hexdigits       =       $e4               ; 2 bytes
+Hexdigits_H     =       $e5
+strptr          =       $e6
+strptrh         =       $e7		; temporary string pointer (not preserved across calls)
+
 ; Local Non-Zero Page Variables
-;
+; Unchange from Daryl's code except for addition of the interrupt vectors
 buffer         =     $0300             ; keybd input buffer (127 chrs max)
 PCH            =     $03e0             ; hold program counter (need PCH next to PCL for Printreg routine)
 PCL            =     $03e1             ;  ""
@@ -60,7 +51,6 @@ nmi_vector      =       $03ea           ; NMI vector
 ; Print2SP     - prints 2 spaces
 ; Print1SP     - prints 1 space
 ; Input_Char    - get one byte from input port, waits for input
-; check_Input   - Checks for an input character (no waiting)
 ; Output_char   - send one byte to the console
 ; *************************************************************************
 ;
@@ -550,9 +540,6 @@ Version         jsr     Print_CR          ;
 		ldx	#<buildtxt
                 jsr     PrintStrAX
                 rts                     ;
-
-;---------------------------------------------------------------------
-; 
 
 ;
 ;-----------DATA TABLES ------------------------------------------------

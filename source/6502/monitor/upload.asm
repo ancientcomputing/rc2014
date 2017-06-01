@@ -5,102 +5,17 @@
 ; upload.asm   
 ; By Daryl Rictor & Ross Archer  Aug 2002
 ;
-; 21st century code for 20th century CPUs (tm?)
-; 
-; A simple file transfer program to allow upload from a serial
-; port to the SBC.  It integrates both x-modem/CRC transfer protocol 
-; and Intel Hex formatted files. Primary is XMODEM-CRC, due to its
-; superior reliability.  Fallback to Intel Hex is automagical following
-; receipt of the first Hexfile d/l character, so the selection is 
-; transparent to the user.
-;
-; Files uploaded via XMODEM-CRC must be
-; in .o64 format -- the first two bytes are the load address in
-; little-endian format:  
-;  FIRST BLOCK
-;     offset(0) = lo(load start address),
-;     offset(1) = hi(load start address)
-;     offset(2) = data byte (0)
-;     offset(n) = data byte (n-2)
-;
-; Subsequent blocks
-;     offset(n) = data byte (n)
-;
-; The TASS assembler and most Commodore 64-based tools generate this
-; data format automatically and you can transfer their .obj/.o64 output
-; file directly.  
-;   
-; The only time you need to do anything special is if you have 
-; a raw memory image file (say you want to load a data
-; table into memory). For XMODEM you'll have to 
-; "insert" the start address bytes to the front of the file.
-; Otherwise, XMODEM would have no idea where to start putting
-; the data.
-;
-; The "fallback" format is Intel Hex.  As address information is included
-; at the start of each line of an Intel Hex file, there is no need for a special
-; "first block". As soon as the receiver sees an Intel Hex
-; character ':' coming in, it aborts the XMODEM-CRC upload attempt and
-; tries to accept Intel Hex instead.  This is the format used natively
-; by a lot of generic tools such as TASM.
-; Note there is no "fallback fallback."  Once it quits CRC and 
-; thinks you're sending it Intel Hex, you either have to finish the download 
-; or press CTRL-C to abort.
-;
-; By having support for both formats under the same "U"pload command,
-; it enables seamless switching between either kind of toolchain with
-; no special user intervention.  This seemed like a Good Thing (tm).
-;
-; Note: testing shows that no end-of-line delay is required for Intel Hex
-; uploads, but in case your circumstances differ and you encounter
-; error indications from a download (especially if you decided to run the
-; controller under 1 Mhz), adding a 10-50 mS delay after each line is 
-; harmless and will ensure no problems even at low clock speeds
-;
-;
-; Style conventions being tried on this file for possible future adoption:
-; 1. Constants known at assembly time are ALL CAPS
-; 2. Variables are all lower-case, with underscores used as the word separator
-; 3. Labels are PascalStyleLikeThis to distinguish from constants and variables
-; 4. Old labels from external modules are left alone.  We may want
-;    to adopt these conventions and retrofit old source later.
-; 5. Op-codes are lower-case
-; 6. Comments are free-style but ought to line up with similar adjacent comments
 
-; zero page variables (Its ok to stomp on the monitor's zp vars)
-;
-;
-;crc		=	$38		; CRC lo byte
-;crch		=	$39		; CRC hi byte
-;ptr		=	$3a		; data pointer
-;ptrh		=	$3b		;   "    "
-;blkno		=	$3c		; block number
-;retry		=	$3d		; retry counter
-;retry2	=	$3e		; 2nd counter
-;bflag		=	$3f		; block flag 
+temp      	=   	$e0     	; save hex value
+chksum    	=   	$e8        	; record checksum accumulator
+reclen    	=   	$ea        	; record length in bytes
+start_lo  	=   	$ec
+start_hi  	=   	$ed
+rectype   	=   	$ee
+dlfail    	=   	$ef     	; flag for upload failure
+bytecount_l     =       $f0
+bytecount_h     =       $f1
 
-bytecount_l     =       $36
-bytecount_h     =       $37
-chksum    	=   	$38        	; record checksum accumulator
-reclen    	=   	$39        	; record length in bytes
-start_lo  	=   	$3b
-start_hi  	=   	$3c
-rectype   	=   	$3d
-dlfail    	=   	$3e     	; flag for upload failure
-temp      	=   	$3f     	; save hex value
-
-;
-;  tables and constants
-;
-;crclo    	=	$7a00      	; Two 256-byte tables for quick lookup
-;crchi    	= 	$7b00      	; (should be page-aligned for speed)
-;Rbuff		=	$0300      	; temp 128 byte receive buffer 
-					; (uses the Monitor's input buffer)
-SOH		=	$01		; start block
-EOT		=	$04		; end of text marker
-ACK		=	$06		; good block acknowleged
-NAK		=	$15		; bad block acknowleged
-CAN		=	$18		; cancel (not standard, not supported)
 CR		=	13
 LF		=	10
 ESC         =     27          ; ESC to exit
