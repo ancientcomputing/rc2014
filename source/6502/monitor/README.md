@@ -4,7 +4,7 @@ This is a simple 6502 Monitor/Debugger for the RC2014 6502 CPU Board.
 <p>
 This is derived from Daryl Rictor's monitor program (5.1.1 Lite), but heavily modified to provide a similar user interface as the RC2014 Z80 Monitor/Debugger.
 <p>
-Daryl's and Ross Archer's (who wrote the Intel HEX uploader) rights are respected. Daryl's website is at: <a href="http://sbc.rictor.org/">http://sbc.rictor.org/</a>.
+Daryl's and Ross Archer's (who wrote the Intel HEX uploader) rights are respected. Daryl's website is at: <a href="http://sbc.rictor.org/">http://sbc.rictor.org/</a>. A webpage with Ross' original code is <a href="http://6502.org/source/monitors/intelhex/intelhex.htm">here</a>.
 <p>
 Changes to the original code are copyright Ben Chong and freely licensed to the community.
 <p>
