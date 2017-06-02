@@ -6,13 +6,13 @@
 ; By Daryl Rictor & Ross Archer  Aug 2002
 ;
 
-temp      	=   	$e0     	; save hex value
-chksum    	=   	$e8        	; record checksum accumulator
+temp      	=   	$e8     	; save hex value
+chksum    	=   	$e9        	; record checksum accumulator
 reclen    	=   	$ea        	; record length in bytes
+dlfail    	=   	$eb    	        ; flag for upload failure  
 start_lo  	=   	$ec
 start_hi  	=   	$ed
 rectype   	=   	$ee
-dlfail    	=   	$ef     	; flag for upload failure
 bytecount_l     =       $f0
 bytecount_h     =       $f1
 
