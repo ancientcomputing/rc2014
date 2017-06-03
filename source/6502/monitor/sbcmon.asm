@@ -8,6 +8,15 @@
 ;       5.1.1 Lite Version - removed List and Mini-Assembler & Help
 ;
 ;
+
+CR		=	13
+LF		=	10
+ESC             =     27          ; ESC to exit
+
+;input_char      = $ff03         ; wait for input character
+;check_input     = $ff06         ; scan for input (no wait), C=1 char, C=0 no character
+;output_char     = $ff09         ; send 1 character
+
 ;*********************************************************************       
 ;  local Zero-page variables
 ; Modified from Daryl's code so that we overlap with EhBASIC as little
@@ -202,14 +211,22 @@ Monitor
                 TXS		        ;  Init the stack
 monitor_loop
                 jsr    print_cr
-                lda     #'>'            ; Print prompt
-                jsr     output_char
+;                lda     #'>'            ; Print prompt
+;                jsr     output_char
+                lda     #>monitorprompt
+                ldx     #<monitorprompt
+                jsr     printstrax
                 ; Init monitor variables
                 lda     #$00              ;
                 sta     Hexdigits         ;  holds parsed hex
                 sta     Hexdigits_H       ;
                 jsr    input_char        ; Get user input; blocking
+                cmp     #32             ; Control character?
+                bcc     ml_not_printable    ; not printable
+                cmp     #127            ; non-ascii characters?
+                bcs     ml_not_printable
                 jsr    output_char          ; Echo
+ml_not_printable
                 cmp     #':'            ; HEX upload?
                 bne     nothex
                 jmp     HexUpLd
@@ -237,9 +254,13 @@ notdump
 go_exec
         jsr     print1sp        ; Space out
         jsr     get_word        ; Grab address
-        cpy     #$00            ; Did we grab a whole word?
-        bne     ge_end
-        ; Print out the bytes
+        bcc     ge_0            ; All hex chars
+        cmp     #$0d            ; Is the last char RETURN?
+        bne     ge_end          ; No, then quit
+ge_0
+;        cpy     #$00            ; Did we grab a whole word?
+;        bne     ge_end
+        ; Print out where we are going to jump to
         lda	#>ge_string
 	ldx	#<ge_string
 	jsr     PrintStrAX
@@ -275,6 +296,7 @@ get_byte
 ;---------------------------------------------------------------------
 ; Get 16-bit word
 ; Exit: Y=0 if we got all the nibbles
+;       CY=1 if the last char is non-hex
 get_word
         ldy     #$04
 get_byte_start                  ; Y contains nibble count
@@ -298,6 +320,7 @@ gw_loop1                        ; Insert nibble
         sta     Hexdigits
         dey
         bne     gw_loop0        ; Loop until we get all in
+        clc                     ; Clear carry
 gw_end
         rts
 
@@ -312,7 +335,10 @@ gw_end
 ; C=1 if invalid
 get_hex_char
         jsr     input_char       ; Get character, blocking
+        cmp     #32             ; Control character?
+        bcc     ghc_not_printable    ; not printable
         jsr     output_char          ; Echo character
+ghc_not_printable
         ; Character in A
         ; Check if it is a hex
 check_hex_char 
@@ -342,7 +368,7 @@ ghc_abort
 ;---------------------------------------------------------------------       
 
 helptxt
-                .byte   $0d,$0a,"6502 Monitor RC2014 v0.1.1"
+                .byte   $0d,$0a,"6502 Monitor RC2014 v0.1.2"
                 .byte   CR,LF,"?              Print this help"
 		.byte	CR,LF,"D XXXX         Dump memory from XXXX"
 		.byte	CR,LF,"E XXXX         Edit memory from XXXX"    ;; CR to skip"
@@ -360,7 +386,7 @@ go_help
         ldx   #$ff              ; set txt pointer
 gh_loop
         inx                     ;
-        JSR   Output_char            ; put character to Port
+        jsr   Output_char            ; put character to Port
         lda   helptxt,x         ; get message text
         bne   gh_loop      ; 
         tax             ; Init x = 0
@@ -387,8 +413,12 @@ go_mem
         jsr     print1sp        ; Space out
         ; Get address
         jsr     get_word
-        cpy     #$00            ; Did we grab a whole word?
-        bne     gm_end
+        bcc     gm_0            ; All hex chars
+        cmp     #$0d             ; Is the last char RETURN?
+        bne     gm_end          ; No, then quit
+gm_0
+;        cpy     #$00            ; Did we grab a whole word?
+;        bne     gm_end
         ; Copy the word to the address pointer
         lda     Hexdigits
         sta     Startaddr
@@ -402,6 +432,9 @@ gm_loop1
         ldx     Startaddr
         jsr     print2byte
         jsr     print1sp        ; 1 Space
+        lda     #':'
+        jsr     output_char
+        jsr     print1sp
         ; Print byte at address
         ldy     #$00
         lda     (Startaddr), y  ; get byte at address
@@ -466,8 +499,12 @@ dump_mem
         jsr     print1sp        ; Space out
         ; Get address
         jsr     get_word
-        cpy     #$00            ; Did we grab a whole word?
-        bne     dm_end
+        bcc     dm_0            ; All hex chars
+        cmp     #$0d             ; Is the last char RETURN?
+        bne     dm_end          ; No, then quit
+dm_0
+;        cpy     #$00            ; Did we grab a whole word?
+;        bne     dm_end
         ; Copy the word to the address pointer
         lda     Hexdigits
         sta     Startaddr
@@ -483,7 +520,7 @@ dm_loop1
         lda     Startaddr_H
         ldx     Startaddr
         jsr     print2byte
-        jsr     print1sp        ; 1 Space
+        jsr     print2sp        ; 1 Space
         ; Read 16 bytes
         ldy     #$00
         ldx     #$10
@@ -495,7 +532,7 @@ dm_loop2
         dex
         bne     dm_loop2
         ; Next section
-        lda     #':'
+        lda     #';'
         jsr    output_char
         jsr     print1sp
         ldy     #$00
@@ -554,6 +591,7 @@ buildtxt
                 .byte   $0d, $0a
                 .byte   $00
 	
-
+monitorprompt   .byte   "Monitor >"
+                .byte   $00
 
 ;end of file
