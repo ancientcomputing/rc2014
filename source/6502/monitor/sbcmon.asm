@@ -223,14 +223,12 @@ monitor_loop
                 jsr    input_char        ; Get user input; blocking
                 cmp     #32             ; Control character?
                 bcc     ml_not_printable    ; not printable
-                cmp     #127            ; non-ascii characters?
-                bcs     ml_not_printable
                 jsr    output_char          ; Echo
 ml_not_printable
-                cmp     #':'            ; HEX upload?
-                bne     nothex
-                jmp     HexUpLd
-nothex
+;                cmp     #':'            ; HEX upload?
+;                bne     nothex
+;                jmp     HexUpLd
+;nothex
                 cmp     #'?'
                 bne     nothelp
                 jmp     go_help
@@ -247,7 +245,11 @@ notmem
                 bne     notdump
                 jmp     go_dump
 notdump
-                jmp     monitor_loop    ; Reloop if invalid command
+                cmp     #'U'
+                bne     notupload
+                jmp     hexupld
+notupload
+                jmp     monitor ;_loop    ; Reloop if invalid command
 
 ;---------------------------------------------------------------------
 ; Go and run a program...
@@ -368,12 +370,12 @@ ghc_abort
 ;---------------------------------------------------------------------       
 
 helptxt
-                .byte   $0d,$0a,"6502 Monitor RC2014 v0.1.2"
+                .byte   $0d,$0a,"6502 Monitor RC2014 v0.1.3"
                 .byte   CR,LF,"?              Print this help"
 		.byte	CR,LF,"D XXXX         Dump memory from XXXX"
-		.byte	CR,LF,"E XXXX         Edit memory from XXXX"    ;; CR to skip"
+		.byte	CR,LF,"E XXXX         Edit memory from XXXX"
 		.byte	CR,LF,"G XXXX         Go execute from XXXX"
-		.byte	CR,LF,":sHLtD...C     Load Intel HEX file, ':' is part of file",0
+		.byte	CR,LF,"U              Upload Intel HEX file",0
 helptxt2:
 		.byte   CR,LF,"               ESC to quit when upload is done"
                 .byte   $0d, $0a
@@ -587,7 +589,7 @@ Hexdigdata     .byte "0123456789ABCDEF";hex char table
 ;
 buildtxt         
                 .byte   $0d, $0a
-                .byte   "6502 Board for RC2014"
+                .byte   "6502 CPU for RC2014"
                 .byte   $0d, $0a
                 .byte   $00
 	

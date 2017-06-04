@@ -16,11 +16,6 @@ rectype   	=   	$ee
 bytecount_l     =       $f0
 bytecount_h     =       $f1
 
-CR		=	13
-LF		=	10
-ESC         =     27          ; ESC to exit
-
-
 ;
 ;
 ;****************************************************
@@ -34,26 +29,40 @@ HexUpLd
         	sta	dlfail          ;Start by assuming no D/L failure
         	sta     bytecount_l
         	sta     bytecount_h
-	  	beq	IHex	        ; Equivalent to a BRA
+                lda	#>MsgStart
+		ldx	#<MsgStart
+                jsr     PrintStrAX
+;	  	beq	IHex	        ; Equivalent to a BRA
                 ; Record processing loop
-HdwRecs 	jsr     GetSer          ; Wait for start of record mark ':'
+HdwRecs         
+                jsr     input_char
+                cmp     #ESC            ; If we pressed ESC
+                bne     hul0
+hul1
+                jmp     HdEr3
+        ; 	jsr     GetSer          ; Wait for start of record mark ':'
+hul0
         	cmp     #':'
         	bne     HdwRecs         ; not found yet
         	; Start of record marker has been found
 IHex    	jsr     GetHex          ; Get the record length
+                bcs     hul1            ; ESC = quit
         	sta     reclen          ; save it
        	 	sta     chksum          ; and save first byte of checksum
         	jsr     GetHex          ; Get the high part of start address
+                bcs     hul1            ; ESC = quit
         	sta     start_hi
         	clc
         	adc     chksum          ; Add in the checksum       
         	sta     chksum          ; 
         	jsr     GetHex          ; Get the low part of the start address
+        	bcs     hul1            ; ESC = quit
         	sta     start_lo
         	clc
         	adc     chksum
         	sta     chksum  
         	jsr     GetHex          ; Get the record type
+                bcs     HdEr3
         	sta     rectype         ; & save it
         	clc
         	adc     chksum
@@ -62,8 +71,10 @@ IHex    	jsr     GetHex          ; Get the record length
         	bne     HdEr1           ; end-of-record
         	ldx     reclen          ; number of data bytes to write to memory
         	ldy     #0              ; start offset at 0
+
                 ; Data handler loop
 HdLp1   	jsr     GetHex          ; Get the first/next/last data byte
+                bcs     HdEr3
         	sta     (start_lo),y    ; Save it to RAM
         	inc     bytecount_l     ; increment byte count
         	bne     bc_1
@@ -76,12 +87,14 @@ bc_1
         	dex                     ; decrement count
         	bne     HdLp1
         	jsr     GetHex          ; get the checksum
+                bcs     HdEr3
         	clc
         	adc     chksum
         	bne     HdDlF1          ; If failed, report it
         	; Another successful record has been processed
-        	lda     #'#'            ; Character indicating record OK = '#'
+        	lda     #'.'            ; Character indicating record OK = '.'
         	sta	uart_xmit        ; write it out but don't wait for output 
+;                jsr     output_char
         	jmp     HdwRecs         ; get next record    
         	; Bad checksum 
 HdDlF1  	lda     #'F'            ; Character indicating record failure = 'F'
@@ -105,7 +118,8 @@ HdEr1   	cmp     #1              ; Check for end-of-record type
 		jmp	HdwRecs
 
 		; We've reached the end-of-record record
-HdEr2   	jsr     GetHex          ; get the checksum 
+HdEr2   	jsr     GetHex          ; get the checksum
+                bcs     HdEr3           ; ESC = quit 
         	clc
         	adc     chksum          ; Add previous checksum accumulator value
         	beq     HdEr3           ; checksum = 0 means we're OK!
@@ -113,14 +127,17 @@ HdEr2   	jsr     GetHex          ; get the checksum
 		ldx	#<MsgBadRecChksum
                 jsr     PrintStrAX
                 jmp     HdErNX
-                ; Completion
+
+                ; -------------------
+                ; We're done here
 HdEr3   	lda     dlfail
-        	beq     HdErOK
+        	beq     HdErOK          ; No errors
         	;A upload failure has occurred
 		lda	#>MsgUploadFail
 		ldx	#<MsgUploadFail
                 jsr     PrintStrAX
-                jmp     HdErNX
+                jmp     HdErNX          ; Quit
+                ; No errors     
 HdErOK  	lda	#>MsgUploadOK
 		ldx	#<MsgUploadOK
                 jsr     PrintStrAX
@@ -136,22 +153,29 @@ HdErNX
 ;  subroutines
 ;
                      
-GetSer  	jsr	input_char	; get input from Serial Port	    
-                cmp     #ESC            ; check for abort 
-        	bne     GSerXit         ; return character if not
- 
-                ; Escape
-                jmp     HdEr3
+;GetSer  	jsr	input_char	; get input from Serial Port	    
+;                cmp     #ESC            ; check for abort 
+;        	bne     GSerXit         ; return character if not
+; 
+;                ; Escape
+;                jmp     HdEr3
 
+;---------------------------------------------------------------------
+; Exit: CY=1 if ESC
 GetHex  	lda     #$00
 	  	sta     temp
         	jsr     GetNibl
+        	bcs     gh_quit
         	asl     a
         	asl     a
         	asl     a
        	 	asl     a       	; This is the upper nibble
         	sta     temp
-GetNibl 	jsr     GetSer
+GetNibl
+; 	jsr     GetSer
+                jsr     input_char
+                cmp     #ESC
+                beq     gh_quit
 					; Convert the ASCII nibble to numeric value from 0-F:
 	        cmp     #'9'+1  	; See if it's 0-9 or 'A'..'F' (no lowercase yet)
        	 	bcc     MkNnh   	; If we borrowed, we lost the carry so 0..9
@@ -160,8 +184,12 @@ GetNibl 	jsr     GetSer
 MkNnh   	sbc     #'0'-1  	; subtract off '0' (if carry clear coming in)
         	and     #$0F    	; no upper nibble no matter what
         	ora     temp
-GSerXit
+        	clc
+;GSerXit
         	rts             	; return with the nibble received
+gh_quit
+                sec
+                rts
 
 
 
@@ -181,6 +209,10 @@ MsgUploadFail   .byte   CR,LF
 MsgUploadOK	.byte   CR,LF
                 .byte   "Upload byte count: "
         	.byte   0   
+        	
+MsgStart        .byte   CR, LF
+                .byte   "Upload now (ESC to quit):"
+                .byte   0
       	
 ;  Fin.
 ;

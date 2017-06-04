@@ -49,8 +49,8 @@ uart_init
                 sta     uart_reg4       ; Enable RTS
                 LDA     #$87            ; FIFO enable, reset RCVR/XMIT FIFO
                 sta     uart_reg2
-                lda     #$01            ; Enable receiver interrupt
-                sta     uart_reg1
+;                lda     #$01            ; Enable receiver interrupt
+;                sta     uart_reg1
                 jsr     AFE_16C550      ; Enable auto flow control
                 rts                     ; done
                 
