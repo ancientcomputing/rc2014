@@ -370,7 +370,7 @@ ghc_abort
 ;---------------------------------------------------------------------       
 
 helptxt
-                .byte   $0d,$0a,"6502 Monitor RC2014 v0.1.3"
+                .byte   $0d,$0a,"6502 Monitor RC2014 v0.1.4"
                 .byte   CR,LF,"?              Print this help"
 		.byte	CR,LF,"D XXXX         Dump memory from XXXX"
 		.byte	CR,LF,"E XXXX         Edit memory from XXXX"
