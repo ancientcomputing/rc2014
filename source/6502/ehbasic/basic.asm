@@ -1197,6 +1197,12 @@ LAB_142A
 	INY				; adjust for line copy
 	INY				; adjust for line copy
 	INY				; adjust for line copy
+	; add patch for when Ibuffs is $xx00 - Daryl Rictor
+        LDA     Bpntrl          ; test for $00
+        BNE     LAB_142P        ; not $00
+        DEC     Bpntrh          ; allow for increment when $xx00
+LAB_142P
+        ; end of patch
 	DEC	Bpntrl		; allow for increment (change if buffer starts at $xxFF)
 	RTS
 
@@ -2111,7 +2117,7 @@ LAB_16FD
 	JMP	LAB_SNER		; do syntax error then warm start
 
 ; perform ON
-
+        
 LAB_ON
 	CMP	#TK_IRQ		; was it IRQ token ?
 	BNE	LAB_NOIN		; if not go check NMI
@@ -2123,7 +2129,7 @@ LAB_NOIN
 	BNE	LAB_NONM		; if not go do normal ON command
 
 	JMP	LAB_SNMI		; else go set-up NMI
-
+        
 LAB_NONM
 	JSR	LAB_GTBY		; get byte parameter
 	PHA				; push GOTO/GOSUB token
@@ -7273,10 +7279,10 @@ LAB_FBA0
 
 	DEC	ccnull		; else decrement countdown
 LAB_FBA2
-	LDX	#NmiBase		; set pointer to NMI values
-	JSR	LAB_CKIN		; go check interrupt
-	LDX	#IrqBase		; set pointer to IRQ values
-	JSR	LAB_CKIN		; go check interrupt
+;;	LDX	#NmiBase		; set pointer to NMI values
+;;	JSR	LAB_CKIN		; go check interrupt
+;;	LDX	#IrqBase		; set pointer to IRQ values
+;;	JSR	LAB_CKIN		; go check interrupt
 LAB_CRTS
 	RTS
 
@@ -7345,8 +7351,9 @@ LAB_FB96
 ; these routines only enable the interrupts if the set-up flag is set
 ; if not they have no effect
 
-; perform IRQ {ON|OFF|CLEAR}
 
+
+; perform IRQ {ON|OFF|CLEAR}
 LAB_IRQ
 	LDX	#IrqBase		; set pointer to IRQ values
 	.byte	$2C			; make next line BIT abs.
@@ -7421,7 +7428,7 @@ LAB_IRTS
 ; return from IRQ service, restores the enabled flag.
 
 ; perform RETIRQ
-
+                
 LAB_RETIRQ
 	BNE	LAB_IRTS		; exit if following token (to allow syntax error)
 
