@@ -34,6 +34,14 @@ A basic UART board using ancient UART devices like the 6402, AY-3-1015 or simila
 <p>
 A simple board providing 32KB of RAM and 32KB of ROM. Usable with EPROM or EEPROM. Switchable to allow ROM at the top of memory or at the bottom of memory. This provides for compatibility with 6502 or 680x CPU boards.
 <p>
+<b>6502 CPU Board (TESTED)</b>
+<p>
+Run the 6502 microprocessor on the RC2014!
+<p>
+The 6502, along with the Z80, powered much of the home computer industry in the late 1970s and 1980s.
+<p>
+My blog <a href="https://ancientcomputing.blogspot.com">ancientcomputing.blogspot.com</a> has a number of articles that cover how the 6502 bus was made to work on the RC2014 bus and which RC2014 boards can work (with or without minor modifications) with the 6502 CPU board.
+<p>
 <hr>
 <p>
 <b>IMPORTANT</b>: These designs unless described otherwise are at the prototype stage as of now. I have put in the initial board orders at OSH Park and have not tested any of the designs. If you do find errors, please flag them!
