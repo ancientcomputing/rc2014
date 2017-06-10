@@ -33,16 +33,18 @@ strptrh         =       $e7		; temporary string pointer (not preserved across ca
 
 ; Local Non-Zero Page Variables
 ; Unchange from Daryl's code except for addition of the interrupt vectors
-buffer         =     $0300             ; keybd input buffer (127 chrs max)
-PCH            =     $03e0             ; hold program counter (need PCH next to PCL for Printreg routine)
-PCL            =     $03e1             ;  ""
-ACC            =     $03e2             ; hold Accumulator (A)
-XREG           =     $03e3             ; hold X register
-YREG           =     $03e4             ; hold Y register
-SPTR           =     $03e5             ; hold stack pointer
-PREG           =     $03e6             ; hold status register (P)
+buffer          =       $0300             ; keybd input buffer (127 chrs max)
+PCH             =       $03e0             ; hold program counter (need PCH next to PCL for Printreg routine)
+PCL             =       $03e1             ;  ""
+ACC             =       $03e2             ; hold Accumulator (A)
+XREG            =       $03e3             ; hold X register
+YREG            =       $03e4             ; hold Y register
+SPTR            =       $03e5             ; hold stack pointer
+PREG            =       $03e6             ; hold status register (P)
 irq_vector      =       $03e8           ; Interrupt vector
 nmi_vector      =       $03ea           ; NMI vector
+realpcl         =       $03eb
+realpch         =       $03ec
 ;
 
 ;
@@ -50,8 +52,7 @@ nmi_vector      =       $03ea           ; NMI vector
 ; *************************************************************************
 ; kernal commands
 ; *************************************************************************
-; PrintRegCR   - subroutine prints a CR, the register contents, CR, then returns
-; PrintReg     - same as PrintRegCR without leading CR
+; PrintReg     - Prints CR, the register contents, CR, then returns
 ; Print2Byte   - prints AAXX hex digits
 ; Print1Byte   - prints AA hex digits
 ; PrintDig     - prints A hex nibble (low 4 bits)
@@ -63,27 +64,36 @@ nmi_vector      =       $03ea           ; NMI vector
 ; Output_char   - send one byte to the console
 ; *************************************************************************
 ;
-RegData        .byte" PC=  A=  X=  Y=  S=  P= (NVRBDIZC)="
+;---------------------------------------------------------------------
+; Print register contents
+; Changed this for better clarity
+RegData        .byte    " PC=  A=  X=  Y=  S=  P= "
+FlagsData       .byte   CR,LF," NVRBDIZC",0
 ;
 ; Prints a CR, the register contents, CR, then returns
 ;
-PrintReg       Jsr   Print_CR          ; Lead with a CR
+PrintReg       jsr   Print_CR          ; Lead with a CR
                ldx   #$ff              ;
                ldy   #$ff              ;
 Printreg1      iny                     ;
                lda   Regdata,y         ;
                jsr   Output_char            ;
-               cmp   #$3D              ; "="
-               bne   Printreg1         ;
+               cmp      #$3D            ; "="
+               beq      printreg2
+               cmp      #$00            ; End of FlagsData string?
+               bne      Printreg1       ;
+               inx
+               jmp      printreg3
 Printreg2      inx                     ;
-               cpx   #$07              ;
-               beq   Printreg3         ; done with first 6
                lda   PCH,x             ;  
                jsr   Print1Byte        ;
                cpx   #$00              ;
                bne   Printreg1         ;
                beq   Printreg2         ;
-Printreg3      dex                     ;
+                ; Print flags detail
+Printreg3       jsr     print_cr
+                jsr     print1sp
+                dex                     ;
                lda   PCH,x             ; get Preg
                ldx   #$08              ; 
 Printreg4      rol                     ;
@@ -169,36 +179,90 @@ PrintStrAXX1    pla
 		rts   
 
 ;---------------------------------------------------------------------
-;
 ; Break Handler
-;
-BRKroutine     sta   ACC               ; save A    Monitor"s break handler
-               stx   Xreg              ; save X
-               sty   Yreg              ; save Y
-               pla                     ; 
-               sta   Preg              ; save P
-               pla                     ; PCL
-               tay
-               pla                     ; PCH
-               tax
-               tya 
-               sec                     ;
-               sbc   #$02              ;
-               sta   PCL               ; backup to BRK cmd
-               bcs   Brk2              ;
-               dex                     ;
-Brk2           stx   PCH               ; save PC
-               TSX                     ; get stack pointer
-               stx   SPtr              ; save stack pointer
-               jsr   PrintReg          ; dump register contents 
-               ldx   #$FF              ; 
-               txs                     ; clear stack
-               cli                     ; enable interrupts again
-               jmp   Monitor           ; start the monitor
+; We're going to make this behave like the Z80 Monitor for the RC2014
+; After displaying the Registers, the user can press C to continue with 
+; program execution, or ESC to back to the Monitor
+; What is missing is the C monitor command to continue program execution
+; This is because there is only one stack on the 6502 whereas the Z80
+; can have a Monitor stack and a user application stack.
+BRKroutine
+                pla                     ; X
+                tax                     ;
+                pla                     ; A
+                sta     ACC             ; save A
+                stx     Xreg            ; save X
+                sty     Yreg            ; save Y
+                pla                     ; 
+                sta     Preg            ; save P
+                pla                     ; PCL
+                tay                     ; PCL in Y
+                sty     realpcl
+                pla                     ; PCH
+                tax                     ; PCH in X
+                stx     realpch
+                tya                     ; PCL in A 
+                sec                     ;
+                sbc     #$02            ;
+                sta     PCL             ; backup to BRK cmd
+                bcs     Brk2            ;
+                dex                     ;
+Brk2
+                stx     PCH             ; save PC
+                TSX                     ; get stack pointer
+                stx     SPtr            ; save stack pointer
+                jsr     PrintReg        ; dump register contents
+                ; Insert C and ESC prompt and handling here
+                ; We'll run cli first so that user can
+                ; input C or ESC 
+                cli                     ; enable interrupts again
+                ; Print prompt
+                lda     #>brkprompt
+                ldx     #<brkprompt
+                jsr     printstrax                                
+brknotc                                 ;
+                jsr     input_char
+                cmp     #27             ; Is it ESC?
+                beq     brkexit2mon
+                and     #$5F
+                cmp     #'C'
+                bne     brknotc         ; Retry if invalid command
+                ; Else continue to program execution
+                ; Here, we need to restore stuff to stack and registers then RTI...
+                sei     ; Disable interrupts first
+                ldx     sptr
+                txs
+                ldy     pch
+                ldx     pcl
+                ; Increment PC to instruction just after BRK
+                ; We'll assume that BRK is a single byte instruction
+                inx
+                bne     brknotz
+                iny
+brknotz
+                tya
+                pha             ; High PC
+                txa
+                pha             ; Low PC
+                ; Restore the other CPU styff
+                lda     Preg
+                pha
+                ldy     Yreg
+                ldx     Xreg
+                lda     ACC
+                cli             ; Re-enable interrupts before returning
+                rti
+
+                ; The Monitor entry point already sets up the stack
+brkexit2mon
+                jmp   Monitor           ; start the monitor
+
+brkprompt       .byte   CR, LF, "Press C to continue or ESC to return to Monitor",CR,LF,0
 
 ;*************************************************************************
 ;     
-;  Monitor Program 
+; Monitor Program 
+; The flow of the monitor is adapted from the one for the Z80
 ;
 ;**************************************************************************
 
@@ -211,8 +275,6 @@ Monitor
                 TXS		        ;  Init the stack
 monitor_loop
                 jsr    print_cr
-;                lda     #'>'            ; Print prompt
-;                jsr     output_char
                 lda     #>monitorprompt
                 ldx     #<monitorprompt
                 jsr     printstrax
@@ -370,7 +432,7 @@ ghc_abort
 ;---------------------------------------------------------------------       
 
 helptxt
-                .byte   $0d,$0a,"6502 Monitor RC2014 v0.1.5"
+                .byte   $0d,$0a,"6502 Monitor RC2014 v0.2.0"
                 .byte   CR,LF,"?              Print this help"
 		.byte	CR,LF,"D XXXX         Dump memory from XXXX"
 		.byte	CR,LF,"E XXXX         Edit memory from XXXX"

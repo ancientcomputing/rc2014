@@ -25,7 +25,8 @@ bytecount_h     =       $f1
 ;
 ; Changes:
 ; 1. Make everything breakable/escapable with an ESC
-; 
+; 2. Consolidate error handling
+;
 HexUpLd
 		lda    	#0
         	sta	dlfail          ;Start by assuming no D/L failure
