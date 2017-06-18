@@ -9,4 +9,14 @@ The code is still work-in-progress.
 This work is derived from v2.22 of the EhBASIC that is hosted <a href="https://github.com/Klaus2m5/6502_EhBASIC_V2.22">here</a> by Klaus2m5.
 <p>
 Please note that EhBASIC is not meant for commercial (re)distribution. 
-<p> 
+<p>
+Key differences with the default version of EhBASIC are:
+<br>
+- SYS keyword to exit back to the Monitor/Debugger
+<br>
+- Cold start entry point at $c100
+<br>
+- Warm start entry point at $c103
+<br>
+- Hopefully clearer comments in the code if you need to change addresses around...
+
