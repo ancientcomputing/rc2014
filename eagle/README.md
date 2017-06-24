@@ -42,6 +42,9 @@ The 6502, along with the Z80, powered much of the home computer industry in the 
 <p>
 My blog <a href="https://ancientcomputing.blogspot.com">ancientcomputing.blogspot.com</a> has a number of articles that cover how the 6502 bus was made to work on the RC2014 bus and which RC2014 boards can work (with or without minor modifications) with the 6502 CPU board.
 <p>
+<b>6502 CPU Board RevB (TESTED)</b>
+<p>
+The RevB version of the 6502 CPU board gives you the option of inverting the A14 address line as well. You can use it with the RC2014 64KB RAM card to build a system with 48KB of usable RAM.
 <hr>
 <p>
 <b>IMPORTANT</b>: These designs unless described otherwise are at the prototype stage as of now. I have put in the initial board orders at OSH Park and have not tested any of the designs. If you do find errors, please flag them!
