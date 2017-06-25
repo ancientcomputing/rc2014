@@ -10,4 +10,4 @@ The use of a 16C550 in a 6502 system is important (vs the 16550 version) because
 <p>
 The other major change is the use of a 74HCT138 to give you more addressing options. This allows you to use more than one board in a system: you just need to make sure that each board uses a different port address. Of course, the software needs to be appropriately modified to access port addresses other than C0H which is the default one.
 <p>
-
+Finally, the PLCC socket is a standard part and can be ordered from Mouser (part: 806-PX-44LCC) or Jameco.
