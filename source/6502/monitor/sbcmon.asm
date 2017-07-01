@@ -43,8 +43,8 @@ SPTR            =       $03e5             ; hold stack pointer
 PREG            =       $03e6             ; hold status register (P)
 irq_vector      =       $03e8           ; Interrupt vector
 nmi_vector      =       $03ea           ; NMI vector
-realpcl         =       $03eb
-realpch         =       $03ec
+;realpcl         =       $03eb
+;realpch         =       $03ec
 ;
 
 ;
@@ -197,10 +197,10 @@ BRKroutine
                 sta     Preg            ; save P
                 pla                     ; PCL
                 tay                     ; PCL in Y
-                sty     realpcl
+;                sty     realpcl
                 pla                     ; PCH
                 tax                     ; PCH in X
-                stx     realpch
+;                stx     realpch
                 tya                     ; PCL in A 
                 sec                     ;
                 sbc     #$02            ;
@@ -432,14 +432,14 @@ ghc_abort
 ;---------------------------------------------------------------------       
 
 helptxt
-                .byte   $0d,$0a,"6502 Monitor RC2014 v0.2.0"
-                .byte   CR,LF,"?              Print this help"
-		.byte	CR,LF,"D XXXX         Dump memory from XXXX"
-		.byte	CR,LF,"E XXXX         Edit memory from XXXX"
-		.byte	CR,LF,"G XXXX         Go execute from XXXX"
-		.byte	CR,LF,"U              Upload Intel HEX file",0
+                .byte   $0d,$0a,"6502 Monitor RC2014 v0.2.1"
+                .byte   CR,LF,"?           Print this help"
+		.byte	CR,LF,"D XXXX      Dump memory from XXXX"
+		.byte	CR,LF,"E XXXX      Edit memory from XXXX"
+		.byte	CR,LF,"G XXXX      Go execute from XXXX"
+		.byte	CR,LF,"U           Upload Intel HEX file",0
 helptxt2:
-		.byte   CR,LF,"               ESC to quit when upload is done"
+		.byte   CR,LF,"            ESC to quit when upload is done"
                 .byte   $0d, $0a
                 .byte   $00	
 
@@ -632,7 +632,7 @@ dm_next1                        ; Have we done 16 bytes?
 dm_end       
         jmp     monitor_loop  
 
-dm_prompt       .byte	"Press any key to continue, ESC to abort",0
+dm_prompt       .byte	"Press any key to continue, ESC to quit",0
 
 ;---------------------------------------------------------------------
 ; Print version
