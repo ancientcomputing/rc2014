@@ -6,6 +6,8 @@
 ; Original copyright:
 ;       Lee Davison, RIP
 ;
+; This version was pulled from the github repository of klaus2m5
+;
 ; $E7E1 $E7CF $E7C6 $E7D3 $E7D1 $E7D5 $E7CF $E81E $E825
 ;
 ; 2.00	new revision numbers start here
@@ -472,16 +474,19 @@ Ram_base	= $0400	; start of user RAM (set as needed, should be page aligned)
 
 ; $8000 = 32KB of RAM in system
 ; $c000 = if you have 48KB of RAM
-Ram_top		= $5000	; end of user RAM+1 (set as needed, should be page aligned)
+;Ram_top		= $5000	; end of user RAM+1 (set as needed, should be page aligned)
+Ram_top		= $8000	; end of user RAM+1 (set as needed, should be page aligned)
 
 ; -----------------------------------------------
 ; Program space
 ; -----------------------------------------------
 ; Note that Program space has to be in higher memory than RAM
-; This is for ROM
-;        .org    $c100   ; Start after IO space
-; This is for RAM
-        .org    $5000   ; 
+; This is for execution in ROM
+        .org    $c100   ; Start after RC2014 IO space
+; This is for execution in RAM
+;        .org    $5000   ; 
+
+basic_start_address
 
 ; BASIC cold start entry point
         jmp     LAB_COLD
@@ -8747,3 +8752,7 @@ LAB_IMSG	.byte	" Extra ignored",$0D,$0A,$00
 LAB_REDO	.byte	" Redo from start",$0D,$0A,$00
 
 AA_end_basic
+
+        ; Remove this for execution from RAM
+        .org    basic_start_address+$2EFF
+        .byte   $00
