@@ -9,9 +9,10 @@
 MAXCOUNT        =       64
 HIWATER         =       40
 LOWATER         =       20
-inptr           =       $380    ;$f2
-outptr          =       $381    ;$f3
-charcount       =       $382    ;$f4
+
+inptr           =       $e7     ;$380    ;$f2
+outptr          =       $e8     ;$381    ;$f3
+charcount       =       $e9     ;$382    ;$f4
 
 ;---------------------------------------------------------------------
 ; Initialize buffer operations

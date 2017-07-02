@@ -23,13 +23,12 @@ ESC             =     27          ; ESC to exit
 ; as possible. This was needed to debug EhBASIC during the porting process
 
 ysav            =       $e0               ; 1 byte
-rowcount        =       $e1               ; 1 byte
-Startaddr       =       $e2               ; 2 bytes
-Startaddr_H     =       $e3
-Hexdigits       =       $e4               ; 2 bytes
-Hexdigits_H     =       $e5
-strptr          =       $e6
-strptrh         =       $e7		; temporary string pointer (not preserved across calls)
+Startaddr       =       $e1               ; 2 bytes
+Startaddr_H     =       $e2
+Hexdigits       =       $e3               ; 2 bytes
+Hexdigits_H     =       $e4
+strptr          =       $e5
+strptrh         =       $e6		; temporary string pointer (not preserved across calls)
 
 ; Local Non-Zero Page Variables
 ; Unchange from Daryl's code except for addition of the interrupt vectors
@@ -43,6 +42,7 @@ SPTR            =       $03e5             ; hold stack pointer
 PREG            =       $03e6             ; hold status register (P)
 irq_vector      =       $03e8           ; Interrupt vector
 nmi_vector      =       $03ea           ; NMI vector
+rowcount        =       $03eb               ; 1 byte
 ;realpcl         =       $03eb
 ;realpch         =       $03ec
 ;
