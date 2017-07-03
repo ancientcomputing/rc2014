@@ -5,13 +5,19 @@
 ;
 ;---------------------------------------------------------------------
 
-;irq_vector      =       $03e8           ; Interrupt vector
+; Comment out this next line if you are building this file with the Monitor/Debugger
+irq_vector      =       $03e8           ; Interrupt vector
+
+; Handle interrupt chaining
 old_irq_vectorl         =       $03f0           ; Where we save the old IRQ vector
 old_irq_vectorh         =       $03f1
+
+; The software counter
 via6522_count           =       $03f2
 
 ; Change via_base depending on your hardware set up
 via_base        =       $c070
+; Definition of 6522 registers
 iorb_reg        =       via_base+0
 iora_reg        =       via_base+1
 ddrb_reg        =       via_base+2
@@ -31,13 +37,28 @@ iora2_reg       =       via_base+15
 
 
 ;---------------------------------------------------------------------
-
+; Initalize the chip and interrupt handlers
 via6522_init
-        ; Disable interrupts
-        lda     #$80
+        sei
+        ; Save old IRQ vector
+        lda     irq_vector
+        sta     old_irq_vectorl
+        lda     irq_vector+1
+        sta     old_irq_vectorh
+        ; Insert new IRQ vector
+        lda     #>via6522_irq
+        ldx     #<via6522_irq
+        stx      irq_vector
+        sta      irq_vector+1
+
+        ; Enable interrupts
+        lda     #$c0            ; Enable Timer 1
         sta     ier_reg
+
+        ; Init software counter
         lda     #$00
         sta     via6522_count
+        cli
         rts
         
         
@@ -82,6 +103,8 @@ via6522_cont1
         pla
         STA     T1LL_reg     ;Low-Latch
         stx     T1CH_reg     ;Loads also T1CL and Starts
+
+        IF 0
 via6522_check_count
 loop_cont1
         LDA     IFR_reg         ; Time Out?
@@ -96,9 +119,31 @@ loop_cont1
         sta     via6522_count
         sec
 cc_end
+        ENDIF
         rts
+
+;---------------------------------------------------------------------        
+; Interrupt handler
+via6522_irq
+        lda     ifr_reg
+        asl                     ; Bit 7 -> C
+        bcc     not_via6522_irq         ; Not a 6522 IRQ
+        and     #$80            ; Is it Timer1?
+        bne     via6522_timer1_irq
+        brk                     ; Break if it's some other 6522 interrupt
+via6522_timer1_irq
+        LDA     T1CL_reg        ; Clear Interrupt Flag        
+        inc     via6522_count
+        pla                     ; Restore X
+        tax                     ; 		
+        pla                     ; Restore A
+        rti     
         
+; Not our interrupt, next handler
+not_via6522_irq
+        jmp     (old_irq_vectorl)       ; Jump to the next interrupt handler
         
+
         
         
   
