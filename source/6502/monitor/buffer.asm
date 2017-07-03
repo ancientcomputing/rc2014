@@ -1,4 +1,5 @@
 ; 64 byte char buffer
+; Changes are copyright Ben Chong and freely licensed to the community
 ;---------------------------------------------------------------------
 ; Compare Result	N	Z	C
 ; A, X, or Y < Memory	*	0	0
@@ -37,17 +38,17 @@ put_buffer
         jsr     uart_deassert_rts
 not_hiw
         inc     charcount
-        stx     ysav            ; Temp storage. 6502 doesn't have enough flexibility...!
+;        stx     ysav            ; Temp storage. 6502 doesn't have enough flexibility...!
         ldx     inptr           ; Grab inptr from memory
         pla                     ; Get char
         sta     buffer, x       ; Store in buffer
         inx                     ; Increment to next location
-        cpx     #64             ; Top of buffer area?
+        cpx     #MAXCOUNT       ; Top of buffer area?
         bcc     pb_not          ; < 64
         ldx     #$00            ; If >=64, go back to bottom of buffer 
 pb_not
         stx     inptr           ; Update inptr in memory
-        ldx     ysav            ; Restore X
+;        ldx     ysav            ; Restore X
 bp_max
         rts
 
@@ -67,7 +68,7 @@ not_low
         ldx     outptr
         lda     buffer, x
         inx
-        cpx     #64             ; Top of buffer?
+        cpx     #MAXCOUNT       ; Top of buffer?
         bcc     plb_not         ; No
         ldx     #$00            ; Back to bottom
 plb_not

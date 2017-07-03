@@ -2,8 +2,9 @@
 ; Based on original code by Daryl Rictor
 ; Adapted to 16550 UART board for RC2014
 ; Renamed to 16c550.asm
+; Changes are copyright Ben Chong and freely licensed to the community
 ;
-; Note: Assumes the use of a 16C550 with autoflow control
+; Note: Does not require a 16C550 with autoflow control
 ;
 ; ----------------- assembly instructions ---------------------------- 
 ;

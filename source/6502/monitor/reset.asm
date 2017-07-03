@@ -2,8 +2,6 @@
 ; Modified for RC2014
 ; Changes are copyright Ben Chong and freely licensed to the community
 ;
-; ----------------- assembly instructions ---------------------------- 
-;
 ;****************************************************************************
 ; Reset, Interrupt, & Break Handlers
 ;****************************************************************************
@@ -13,23 +11,23 @@
 ; Vector table
         
         ; Monitor vector $ff00
-                jmp Monitor
+                jmp     Monitor
 
         .org $ff03
-input_char      jmp   uart_input       ; wait for input character
+input_char      jmp     uart_input       ; wait for input character
         ; $ff06
-check_input     jmp   uart_scan        ; scan for input (no wait), C=1 char, C=0 no character
+check_input     jmp     uart_scan        ; scan for input (no wait), C=1 char, C=0 no character
         ; $ff09
-output_char     jmp   uart_Output      ; send 1 character
+output_char     jmp     uart_Output      ; send 1 character
         ; $ff0c
 printstring     jmp     PrintStrAX
 
 ;--------------Reset handler----------------------------------------------
 
-reset          SEI                     ; diable interupts
-               CLD                     ; clear decimal mode                      
-               LDX   #$FF              ;
-               TXS                     ; init stack pointer
+reset          sei                     ; diable interupts
+               cld                     ; clear decimal mode                      
+               ldx      #$FF              ;
+               txs                     ; init stack pointer
 
                 ; Initialize interrupt vectors
                 ; Use null_irq and similar NMI handlers first
@@ -45,8 +43,8 @@ reset          SEI                     ; diable interupts
                 ; At this point, the actual IRQ handling may be set up
                 jsr     uart_init	       
 
-               CLI                      ; Enable interrupt
-               JMP      MonitorBoot     ; Monitor for cold reset                       
+               cli                      ; Enable interrupt
+               jmp      MonitorBoot     ; Monitor for cold reset                       
 
 ; -------------------------------------
 ; Interrupt or BRK entry point
@@ -65,12 +63,12 @@ irqjump         jmp     (irq_vector)    ; Jump to indirect handler
 
                 ; Default IRQ handler, before we return, restore X and A               
 null_irq
-                PLA                     ; Restore X
+                pla                     ; Restore X
                 tax                     ; 		
                 pla                     ; Restore A
                 ; Then return from interrupt
 nmi_handler
-                RTI                     ; Null Interrupt return
+                rti                     ; Null Interrupt return
 
 ; -------------------------------------
 ; NMI entry point

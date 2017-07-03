@@ -43,8 +43,7 @@ PREG            =       $03e6             ; hold status register (P)
 irq_vector      =       $03e8           ; Interrupt vector
 nmi_vector      =       $03ea           ; NMI vector
 rowcount        =       $03eb               ; 1 byte
-;realpcl         =       $03eb
-;realpch         =       $03ec
+;dlfail    	=   	$03ec    	; flag for upload failure  
 ;
 
 ;
