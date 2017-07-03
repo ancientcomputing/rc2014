@@ -1,14 +1,14 @@
 <b>ROMs for the RC2014</b>
 <p>
-rom.rom - BASIC ROM using a modified bas32K.asm and int32K.asm
+The ROM images are organized according to which serial board (UART) they are used with.
 <p>
-mon.rom - Monitor/Debugger for the RC2014. This can replace the original BASIC ROM that comes with the RC2014. 
+68B50: Original RC2014 serial I/O board
 <p>
-monbas.rom - Monitor/Debugger and BASIC in one ROM. This takes up 16KB of ROM space, from 0000h to 3FFFh. You will need to either tweak the standard RC2014 or use the paged ROM board set up appropriately.
+sio: Dr Baker's SIO board
 <p>
-You will boot into the Monitor/Debugger. To go to BASIC, use the G command in the Monitor: G 1000 to cold start BASIC, or G1003 to warm start BASIC.
+16x550: My original 16x550 UART board with 80h base address
 <p>
-To get back to the Monitor, use the "monitor" keyword in BASIC.
+16x550_revb: RevB version of my 16x550 UART board with c0h base address. This version can also be used with the RevC UART board.
 <p>
-mon8080.rom - Monitor for the 8085 CPU Board
-<p>
+8085: ROM images for the 8085 CPU board.
+
