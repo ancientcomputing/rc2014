@@ -1,5 +1,6 @@
 ; Modified for MON6502 for the RC2014
 ; Uses the BIOS for console I/O
+; Added support for ANSI/VT100 terminals that support various advanced features
 ;
 ;***********************************************************************
 ;
@@ -99,10 +100,12 @@ ysav    =       $fd
 ;		*=$1000			; load into RAM @ $1000-$15FF
         .org $1000
 
-		LDA     #$00		; REVERSE TOGGLE
-		STA     REV
+        jsr     clear_screen
+	LDA     #$00		; REVERSE TOGGLE
+	STA     REV
 ;                JSR     Init_6551
-CHESS		CLD			; INITIALIZE
+CHESS
+;		CLD			; INITIALIZE
 		LDX	#$FF		; TWO STACKS
 		TXS	
 		LDX	#$C8
@@ -112,12 +115,27 @@ CHESS		CLD			; INITIALIZE
 ;       DISPLAY AND GET KEY
 ;       FROM KEYBOARD
 ;		
-OUT		JSR	pout		; DISPLAY AND
+OUT
+		JSR	pout		; DISPLAY AND
+bad_key
+                lda     #$0d
+                jsr     output_char
 		JSR	KIN		; GET INPUT   *** my routine waits for a keypress
 ;		CMP	OLDKY		; KEY IN ACC  *** no need to debounce
 ;		BEQ	OUT		; (DEBOUNCE)
 ;		STA	OLDKY
-;		
+;
+                cmp     #$0d             ; ENTER
+                beq     nogo
+                cmp     #'0'
+                bcc     bad_key         ; < 0 -> bad key
+                ; >= 0
+                cmp     #$3A    ;':'
+                bcs     not_number
+                and     #$4f
+                jmp     input
+not_number:
+                and     #$5f
 		CMP	#$43		; [C]
 		BNE	NOSET		; SET UP
 		LDX	#$1F		; BOARD
@@ -140,7 +158,7 @@ NOSET		CMP	#$45		; [E]
 		LDA	#$EE            ; IS
 		BNE	CLDSP
 ;		
-NOREV		CMP	#$40			; [P]
+NOREV		CMP	#$50		; [P]
 		BNE	NOGO           	; PLAY CHESS
 		JSR	GO
 CLDSP		STA	DIS1          	; DISPLAY
@@ -152,9 +170,13 @@ NOGO		CMP	#$0D            ; [Enter]
 		BNE	NOMV          	; MOVE MAN
 		JSR	MOVE          	; AS ENTERED
 		JMP	DISP
-NOMV		CMP     #$41		; [Q] ***Added to allow game exit***
+NOMV
+                jsr     output_char
+		CMP     #$51		; [Q] ***Added to allow game exit***
 		BEQ     DONE		; quit the game, exit back to system.  
-		JMP	INPUT		; process move
+;		JMP	INPUT		; process move
+        jmp     bad_key
+
 DONE		JMP     $FF00		; *** MUST set this to YOUR OS starting address
 ;		
 ;       THE ROUTINE JANUS DIRECTS THE
@@ -225,7 +247,8 @@ ON4		LDA	XMAXC        	; SAVE ACTUAL
 		JSR	UMOVE         	; MOVES
 ;		
 		JMP	STRATGY       	; FINAL EVALUATION
-NOCOUNT	CPX	#$F9
+NOCOUNT
+                CPX	#$F9
 		BNE	TREE
 ;		
 ;      DETERMINE IF THE KING CAN BE
@@ -704,7 +727,9 @@ NOPOSN	JMP	CKMATE       		; CONTINUE
 ; The following routines were added to allow text-based board
 ; display over a standard RS-232 port.
 ;
-POUT        	jsr 	pout9		; print CRLF
+POUT
+;        	jsr 	pout9		; print CRLF
+                jsr     go_home
 		jsr     pout13		; print copyright
 		JSR	POUT10		; print column labels
 		LDY   	#$00		; init board location
@@ -764,7 +789,7 @@ POUT42		JSR	syschout	;
 
 POUT5       	TXA			; print "-----...-----<crlf>"
 		PHA
-		LDX	#$19
+		LDX	#$1a    ;19
 		LDA	#'-'
 POUT6		JSR   	syschout	; PRINT ONE ASCII CHR - "-"
 		DEX
@@ -793,14 +818,17 @@ POUT9      	LDA   	#$0D
                 RTS 
 
 pout10		ldx   	#$00		; print the column labels
-POUT11		lda	#$20		; 00 01 02 03 ... 07 <CRLF>
+POUT11		lda	#'|'    ;#$20		; 00 01 02 03 ... 07 <CRLF>
 		jsr   	syschout
 		txa
 		jsr	syshexout
 		INX
 		CPX   	#$08
 		BNE	POUT11
-		BEQ	POUT9
+		lda     #'|'
+		jsr     syschout
+                jmp     pout9
+;		BEQ	POUT9
 POUT12		TYA
 		and 	#$70
 		JSR 	syshexout
@@ -814,10 +842,12 @@ Pout14		lda   	banner,x
 		bne   	POUT14
 POUT15		rts         
 
-KIN        	LDA   	#'?'
+KIN
+                jsr     eteol
+        	LDA   	#'?'
 		JSR   	syschout	; PRINT ONE ASCII CHR - ?
 		JSR   	syskin		; GET A KEYSTROKE FROM SYSTEM
-            	AND   	#$4F            ; MASK 0-7, AND ALPHA'S
+;;            	AND   	#$4F            ; MASK 0-7, AND ALPHA'S
             	RTS
 
 ; input chr from ACIA1 (blocking)
@@ -846,6 +876,10 @@ PrintDig       AND   #$0F              ;  prints A hex nibble (low 4 bits)
                 ldy     ysav
 ;               PLY
                jmp   syschout          ;
+
+; ANSI/VT100 terminal support
+
+        .include ansivt100.asm
 
 Hexdigdata	.byte	"0123456789ABCDEF"
 banner		.byte	"MicroChess (c) 1996-2005 Peter Jennings, www.benlo.com"
