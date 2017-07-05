@@ -17,7 +17,7 @@ Enter your move in the following way:
 [XY] [AB]<br>
 where XY is the 2 digit coords of the piece you want to move and AB is the 2 digit coords of where you want the piece to go.
 <p>
-Then hit <ENTER>
+Then hit ENTER
 <p>
 To get the computer to make its move, press 'P'.
 <p>
