@@ -65,13 +65,14 @@ via6522_init
 ;---------------------------------------------------------------------        
 ; From: http://6502.org/source/io/6522timr.htm (which included errors)
 ; 1MHz clock + 10000 count = 10ms; $2710 in hex
+; It looks like the actual value is 2 less i.e. $2708
 ; Entry:
 ;   X = count_hi
 ;   A = count_lo
 ; Exit: trashes A
 
 via6522_test_1shot1
-        lda     #$10
+        lda     #$08
         ldx     #$27
 via6522_1shot1
         pha
@@ -94,7 +95,7 @@ loop_1shot1
 ; Returns C=1 if 1 second is up.
 
 via6522_test_cont1
-        lda     #$10
+        lda     #$08
         ldx     #$27
 via6522_cont1
         pha
@@ -132,14 +133,14 @@ via6522_irq
         bne     via6522_timer1_irq
         brk                     ; Break if it's some other 6522 interrupt
 via6522_timer1_irq
-        LDA     T1CL_reg        ; Clear Interrupt Flag        
+        lda     T1CL_reg        ; Clear Interrupt Flag        
         inc     via6522_count
         pla                     ; Restore X
         tax                     ; 		
         pla                     ; Restore A
         rti     
         
-; Not our interrupt, next handler
+; Not our interrupt, next IRQ handler
 not_via6522_irq
         jmp     (old_irq_vectorl)       ; Jump to the next interrupt handler
         
