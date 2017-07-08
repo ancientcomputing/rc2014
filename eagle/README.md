@@ -52,3 +52,8 @@ The RevB version of the 6502 CPU board gives you the option of inverting the A14
 kicadis are encouraged to convert the files to kicad format with the sole requirement that the converted files are made freely available aka "open source"...
 <p>
 Copyright Ben Chong and freely licensed back to the community.
+<p>
+<hr>
+<p>
+<a href="https://www.tindie.com/stores/benchong408/?ref=offsite_badges&utm_source=sellers_benchong408&utm_medium=badges&utm_campaign=badge_small"><img src="https://d2ss6ovg47m0r5.cloudfront.net/badges/tindie-smalls.png" alt="I sell on Tindie"width="200" height="55"></a>
+<p>
