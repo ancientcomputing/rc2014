@@ -33,6 +33,12 @@ strptrh         =       $e6		; temporary string pointer (not preserved across ca
 ; Local Non-Zero Page Variables
 ; Unchange from Daryl's code except for addition of the interrupt vectors
 buffer          =       $0300             ; keybd input buffer (127 chrs max)
+uart_input_vecl =       $03d0           ;
+uart_input_vech =       $03d1
+uart_scan_vecl        =       $03d2
+uart_scan_vech        =       $03d3
+uart_output_vecl        =       $03d4
+uart_output_vech        =       $03d5
 PCH             =       $03e0             ; hold program counter (need PCH next to PCL for Printreg routine)
 PCL             =       $03e1             ;  ""
 ACC             =       $03e2             ; hold Accumulator (A)
@@ -44,6 +50,12 @@ irq_vector      =       $03e8           ; Interrupt vector
 nmi_vector      =       $03ea           ; NMI vector
 rowcount        =       $03eb               ; 1 byte
 ;dlfail    	=   	$03ec    	; flag for upload failure  
+;old_irq_vectorl         =       $03f0           ; Where we save the old IRQ vector
+;old_irq_vectorh         =       $03f1
+;via6522_count           =       $03f2
+;via6522_freqcntl        =       $03f3           ; Count to program into T1
+;via6522_freqcnth        =       $03f4           ; Count to program into T1
+;via6522_duration        =       $03f5           ; Duration in 10ms ticks
 ;
 
 ;
@@ -431,7 +443,7 @@ ghc_abort
 ;---------------------------------------------------------------------       
 
 helptxt
-                .byte   $0d,$0a,"6502 Monitor RC2014 v0.2.1"
+                .byte   $0d,$0a,"6502 Monitor RC2014 v0.2.2"
                 .byte   CR,LF,"?           Print this help"
 		.byte	CR,LF,"D XXXX      Dump memory from XXXX"
 		.byte	CR,LF,"E XXXX      Edit memory from XXXX"
@@ -651,7 +663,6 @@ Hexdigdata     .byte "0123456789ABCDEF";hex char table
 buildtxt         
                 .byte   $0d, $0a
                 .byte   "6502 CPU for RC2014"
-                .byte   $0d, $0a
                 .byte   $00
 	
 monitorprompt   .byte   "Monitor >"

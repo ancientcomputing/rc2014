@@ -14,11 +14,11 @@
                 jmp     Monitor
 
         .org $ff03
-input_char      jmp     uart_input       ; wait for input character
+input_char      jmp     (uart_input_vecl)       ; wait for input character
         ; $ff06
-check_input     jmp     uart_scan        ; scan for input (no wait), C=1 char, C=0 no character
+check_input     jmp     (uart_scan_vecl)        ; scan for input (no wait), C=1 char, C=0 no character
         ; $ff09
-output_char     jmp     uart_Output      ; send 1 character
+output_char     jmp     (uart_output_vecl)      ; send 1 character
         ; $ff0c
 printstring     jmp     PrintStrAX
 
@@ -42,6 +42,20 @@ reset          sei                     ; diable interupts
                 ; Init the I/O devices
                 ; At this point, the actual IRQ handling may be set up
                 jsr     uart_init	       
+                
+                ; Set up default handlers
+                lda     #>uart_input
+                ldx     #<uart_input
+                stx      uart_input_vecl
+                sta      uart_input_vech
+                lda     #>uart_scan
+                ldx     #<uart_scan
+                stx      uart_scan_vecl
+                sta      uart_scan_vech
+                lda     #>uart_output
+                ldx     #<uart_output
+                stx      uart_output_vecl
+                sta      uart_output_vech
 
                cli                      ; Enable interrupt
                jmp      MonitorBoot     ; Monitor for cold reset                       
