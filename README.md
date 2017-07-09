@@ -41,6 +41,8 @@ Do also watch out for the OSH Park logos. Those are links to projects that I hav
 <p>
 For a full list of my shared projects, check out this <a href="https://oshpark.com/profiles/ancientcomputing">link</a>.
 <p>
+I have put some popular boards up for sale on <a href="https://www.tindie.com/stores/benchong408/">Tindie</a>.
+<p>
 <hr>
 <p>
 Lastly, check out the documentation in the docs folder.
