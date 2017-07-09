@@ -10,6 +10,8 @@ There is no option to power the system from the FTDI header.
 <p>
 The port address starts at C0H. A new BIOS will be made available for this. For the impatient, just change the uart_base value to 0c0h from 80h.
 <p>
+<b>16550 board Rev C (TESTED)</b>: Yet another variant of the 16550 board implementation. This time, it uses the PLCC version of the 16550 which is still a current part. This board is also compatible with the new 16C750 which has 64-character FIFOs!
+<p>
 <b>z80_board (TESTED)</b>: This is an opinionated implementation of a CPU module for the RC2014. It is designed for the v1.0 bus but may work for the Pro/v2 bus. The opinionated parts of the design is a bona fide reset circuit (the firmware should start up on power up), and the use of a crystal oscillator.
 <p>
 The crystal oscillator can be connected to the RC2014 bus or not. The decoupling of the Z80's clock from the bus clock means that you are no longer bounded by the requirements of the UART baudrate. You will be able to run the Z80 at 20MHz (assuming you have the 20MHz part and that the bus doesn't impact the high frequency signals too much).
