@@ -10,5 +10,5 @@ sio: Dr Baker's SIO board
 <p>
 16x550_revb: RevB version of my 16x550 UART board with c0h base address. This version can also be used with the RevC UART board.
 <p>
-8085: ROM images for the 8085 CPU board.
+ROM images for the 8085 CPU board have been moved to rom/8080_8085
 
