@@ -47,6 +47,11 @@ My blog <a href="https://ancientcomputing.blogspot.com">ancientcomputing.blogspo
 <b>6502 CPU Board RevB (TESTED)</b>
 <p>
 The RevB version of the 6502 CPU board gives you the option of inverting the A14 address line as well. You can use it with the RC2014 64KB RAM card to build a system with 48KB of usable RAM.
+<p>
+<b>6522 VIA Board (TESTED)</b>
+<p>
+You can start building up a 6502-based RC2014 system using native 6502 peripherals starting with the 6522 VIA board.
+<p>
 <hr>
 <p>
 <b>IMPORTANT</b>: These designs unless described otherwise are at the prototype stage as of now. I have put in the initial board orders at OSH Park and have not tested any of the designs. If you do find errors, please flag them!
