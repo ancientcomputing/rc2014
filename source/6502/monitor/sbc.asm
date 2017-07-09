@@ -20,11 +20,12 @@
 
         ; Change this line according to the type of UART board 
 ;        .include rruart.asm     ; uart init
-;      	 .include 16c550.asm
+      	 .include 16c550.asm
 ;        .include 16c750.asm
 ;        .include 6850.asm
 ;        .include 16c550_irq.asm
-        .include 6551.asm
+;        .include 6551.asm
+;        .include 6551_irq.asm
 
  	.include sbcmon.asm         ; actual monitor
 
