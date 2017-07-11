@@ -62,5 +62,5 @@ Copyright Ben Chong and freely licensed back to the community.
 <p>
 <hr>
 <p>
-<a href="https://www.tindie.com/stores/benchong408/?ref=offsite_badges&utm_source=sellers_benchong408&utm_medium=badges&utm_campaign=badge_small"><img src="https://d2ss6ovg47m0r5.cloudfront.net/badges/tindie-smalls.png" alt="I sell on Tindie"width="200" height="55"></a>
+<a href="https://www.tindie.com/stores/ancientcomputing/?ref=offsite_badges&utm_source=sellers_ancientcomputing&utm_medium=badges&utm_campaign=badge_small"><img src="https://d2ss6ovg47m0r5.cloudfront.net/badges/tindie-smalls.png" alt="I sell on Tindie"width="200" height="55"></a>
 <p>
