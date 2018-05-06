@@ -1,0 +1,140 @@
+
+
+F000                    	.org	$f000
+
+F000                            .include        rruart.asm	
+                        ; 6809 BIOS
+                        ; Based on original code structure by Daryl Rictor
+                        ; Adapted to Real Retro UART board for RC2014
+                        ; Renamed to rruart.asm
+                        ;
+                        ; ----------------- assembly instructions ----------------------------
+                        ;
+                        ; this is a subroutine library only
+                        ; it must be included in an executable source file
+                        ;
+                        ;
+                        ;*** I/O Locations *******************************
+                        ; Define the i/o address of the UART chip
+                        ;*** Real Retro UART ************************
+
+      = C040            uart_base       = $c040
+      = C040            uart_xmit       = $c040
+      = C040            uart_recv       = $c040
+      = C041            uart_status     = $c041
+
+                        ;
+                        ;***********************************************************************
+                        ; UART I/O Support Routines
+                        ; Otherwise, we'll use UART-agnostic nomemclature
+
+                        ;---------------------------------------------------------------------
+                        ;
+F000                    ACIA1_init
+F000                    uart_init
+                                        ; Nothing to init
+F000  C6 04                             ldb     #4
+F002  86 0A                             lda     #$0a
+F004                    ui_loop
+F004  BD F02A                           jsr     uart_output
+F007  5A                                decb
+F008  26 FA                             bne     ui_loop
+F00A  86 0D                             lda     #$0d
+F00C  BD F02A                           jsr     uart_output
+F00F  39                                rts                      ; done
+
+                        ;---------------------------------------------------------------------
+                        ; Input char from UART (blocking)
+                        ; Exit: character in A
+F010                    ACIA1_Input
+F010                    uart_input
+F010  B6 C041                          lda      uart_status           ; Serial port status
+F013  84 01                            anda     #$01               ; is recvr full
+F015  27 F9                            beq      uart_input        ; no char to get
+F017  B6 C040                          lda      uart_recv           ; get chr
+F01A  39                               rts                      ;
+
+                        ;---------------------------------------------------------------------
+                        ; Non-waiting get character routine
+                        ; Scan for input (no wait), C=1 char, C=0 no character
+F01B                    ACIA1_Scan
+F01B                    uart_scan
+F01B  1CFE                              clc
+F01D  B6 C041                           lda     uart_status        ; Serial port status
+F020  84 01                             anda    #$01               ; mask rcvr full bit
+F022  27 05                             beq     uart_scan2
+F024  B6 C040                           lda     uart_recv           ; get chr
+F027  1A01                              sec
+F029  39                uart_scan2     rts
+
+                        ;---------------------------------------------------------------------
+                        ; output to OutPut Port
+                        ; Entry: character in A
+                        ; Exit: character in A
+F02A                    ACIA1_Output
+F02A                    uart_output
+F02A  34 02                             pshs    a                ; save registers
+F02C                    uart_out1
+F02C  B6 C041                           lda     uart_status     ; serial port status
+F02F  84 02                             anda    #$02            ; is tx buffer empty
+F031  27 F9                             beq     uart_out1       ; no
+F033  35 02                             puls    a               ; get chr
+F035  B7 C040                           sta     uart_xmit       ; put character to Port
+F038  39                                rts                     ; done
+                        ;
+                        ;end of file
+                        	
+FF00                    	.org    $ff00
+                        	
+                        ; Vector table
+
+                                ; Monitor vector $ff00
+                        ;                jmp     Monitor
+
+FF03                            .org $ff03
+FF03  7E F010           input_char      jmp     uart_input       ; wait for input character
+                                ; $ff06
+FF06  7E F01B           check_input     jmp     uart_scan        ; scan for input (no wait), C=1 char, C=0 no character
+                                ; $ff09
+FF09  7E F02A           output_char     jmp     uart_Output      ; send 1 character
+
+                        	
+FF0C                    resetvector
+FF0C  10CE 0200                 lds     #$200
+FF10  CE 017F                   ldu     #$17f
+FF13  86 41                     lda     #'A'
+FF15  BD FF09                   jsr     output_char
+FF18  86 62                     lda     #'b'
+FF1A  BD FF09                   jsr     output_char
+FF1D  7E FF1D                   jmp     $
+
+FF20                    swi3vector
+FF20                    swi2vector
+FF20                    firqvector
+FF20                    irqvector
+FF20                    swi1vector
+FF20                    nmivector
+FF20  3B                        rti
+
+
+
+
+FFF0                            .org    $fff0
+
+FFF0  0000              	.word		$0000		
+FFF2  FF20              	.word		swi3vector
+FFF4  FF20              	.word		swi2vector
+FFF6  FF20              	.word		firqvector
+FFF8  FF20              	.word		irqvector
+FFFA  FF20              	.word		swi1vector
+FFFC  FF20              	.word		nmivector
+FFFE  FF0C              	.word		resetvector
+ACIA1_INIT         F000    ACIA1_INPUT        F010    ACIA1_OUTPUT       F02A
+ACIA1_SCAN         F01B    CHECK_INPUT        FF06    FIRQVECTOR         FF20
+INPUT_CHAR         FF03    IRQVECTOR          FF20    NMIVECTOR          FF20
+OUTPUT_CHAR        FF09    RESETVECTOR        FF0C    SWI1VECTOR         FF20
+SWI2VECTOR         FF20    SWI3VECTOR         FF20    UART_BASE          C040 E
+UART_INIT          F000    UART_INPUT         F010    UART_OUT1          F02C
+UART_OUTPUT        F02A    UART_RECV          C040 E  UART_SCAN          F01B
+UART_SCAN2         F029    UART_STATUS        C041 E  UART_XMIT          C040 E
+UI_LOOP            F004
