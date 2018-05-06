@@ -27,7 +27,7 @@ The primary RC2014 Github repo is at: https://github.com/RC2014Z80/RC2014
 <p>
 <b>ROM</b>
 <p>
-ROM images can you can burn into EPROM/EEPROM for use with the RC2014 can be found in the ROM folder.
+ROM images you can burn into EPROM/EEPROM for use with the RC2014 can be found in the ROM folder.
 <p>
 Not all combinations of CPU, serial, Monitor/Debugger, BASIC and ROM image sizes are available. When in doubt you can ask questions on the <a href="https://groups.google.com/forum/#!forum/rc2014-z80">RC2014 group</a> or <a href="http://forum.6502.org/">http://forum.6502.org/</a>.
 <p>
