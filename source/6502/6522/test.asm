@@ -11,18 +11,26 @@ check_input     =       $ff06
 output_char     =       $ff09
 
         .org    $2000
-          
+reloop_scale
+        jsr     play_scale
+        ; Press a key to stop the scale
+        jsr     check_input
+        bcc     reloop_scale
+        jsr     play_doe_a_deer
+        jmp     $ff00           ; return to monitor        
+
+        .org    $2100
+        ; Tests out the free running 1 second timer          
+test_timer
         jsr     via6522_init
         
         lda     #'A'
         jsr     output_char
         
 oc_loop:
-;        jsr     via6522_test_1shot1
-        jsr     via6522_test_cont1
+        jsr     via6522_test_cont1      ; Set up continuous 1s interrupts
 oc_loop2:
-;        jsr     via6522_check_count
-        lda     via6522_count
+        lda     via6522_count           ; Check the counter
         cmp     #100                    ; Are we there yet?
         bcs     oc_1sec
         jsr     check_input
@@ -34,8 +42,10 @@ oc_1sec:
         sta     via6522_count        
         lda     #'#'
 oc_outchar:
-        jsr     output_char        
-;        jmp     oc_loop 
-        jmp     oc_loop2 
+        jsr     output_char
+        jmp     oc_loop2                ; Loop forever
+
+        
+        
         
         .include via6522.asm
