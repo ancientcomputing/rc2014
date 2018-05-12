@@ -149,8 +149,8 @@ not_via6522_irq
         jmp     (old_irq_vectorl)       ; Jump to the next interrupt handler
         
 ;---------------------------------------------------------------------    
-; Set up Timer 1 for continuous with PA7
-via6522_cont1pa7
+; Set up Timer 1 for continuous with PB7
+via6522_cont1pb7
         ; Disable Timer 1 interrupt
         lda     #$40            ; Disable Timer 1
         sta     ier_reg
@@ -192,7 +192,7 @@ loop_1shot2
 ; via6522_duration         =       $03f5
 
 play_tone
-        jsr     via6522_cont1pa7        ; Set up for the tone
+        jsr     via6522_cont1pb7        ; Set up for the tone
 pt_loop
         jsr     via6522_10ms_1shot2     ; Set up timer 2 for tone duration
         dec     via6522_duration
